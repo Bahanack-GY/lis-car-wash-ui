@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Ticket, Search, Plus, User, Car, CheckCircle2, Clock, Loader2, Droplets } from 'lucide-react'
 import { useCoupons, useUpdateCouponStatus } from '@/api/coupons'
 import type { Coupon } from '@/api/coupons/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
@@ -36,8 +37,10 @@ export default function Coupons() {
   const [activeTab, setActiveTab] = useState('Tous')
   const navigate = useNavigate()
 
+  const { selectedStationId } = useAuth()
+
   // Queries & Mutations
-  const { data: couponsData, isLoading, isError } = useCoupons()
+  const { data: couponsData, isLoading, isError } = useCoupons(selectedStationId ? { stationId: selectedStationId } : undefined)
   const updateStatus = useUpdateCouponStatus()
 
   const couponsList: Coupon[] = couponsData?.data || []

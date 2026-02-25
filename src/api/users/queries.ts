@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { usersApi } from './api';
-import type { CreateUserDto, UpdateUserDto, AssignStationDto, TransferStationDto, UserFilters, CreateSanctionDto, LiftSanctionDto } from './types';
+import type { CreateUserDto, UpdateUserDto, AssignStationDto, TransferStationDto, UserFilters, CreateSanctionDto, LiftSanctionDto, CreatePromotionDto } from './types';
 
 export const USERS_KEYS = {
     all: ['users'] as const,
@@ -9,7 +9,7 @@ export const USERS_KEYS = {
     details: () => [...USERS_KEYS.all, 'detail'] as const,
     detail: (id: number) => [...USERS_KEYS.details(), id] as const,
     availableWashers: (stationId: number) => [...USERS_KEYS.all, 'availableWashers', stationId] as const,
-    performance: (id: number, stationId?: number) => [...USERS_KEYS.detail(id), 'performance', stationId] as const,
+    performance: (id: number, stationId?: number, startDate?: string, endDate?: string) => [...USERS_KEYS.detail(id), 'performance', stationId, startDate, endDate] as const,
 };
 
 export const useUsers = (filters?: UserFilters) => {
@@ -35,11 +35,12 @@ export const useUser = (id: number) => {
     });
 };
 
-export const useUserPerformance = (id: number, stationId?: number) => {
+export const useUserPerformance = (id: number, stationId?: number, startDate?: string, endDate?: string) => {
     return useQuery({
-        queryKey: USERS_KEYS.performance(id, stationId),
-        queryFn: () => usersApi.getPerformance(id, stationId),
+        queryKey: USERS_KEYS.performance(id, stationId, startDate, endDate),
+        queryFn: () => usersApi.getPerformance(id, stationId, startDate, endDate),
         enabled: !!id,
+        placeholderData: keepPreviousData,
     });
 };
 
@@ -89,6 +90,17 @@ export const useTransferStation = () => {
     });
 };
 
+export const useUnassignStation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (userId: number) => usersApi.unassignStation(userId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: USERS_KEYS.lists() });
+        },
+    });
+};
+
 export const useAddSanction = () => {
     const queryClient = useQueryClient();
 
@@ -109,6 +121,18 @@ export const useLiftSanction = () => {
             usersApi.liftSanction({ sanctionId: args.sanctionId, data: args.data }),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: USERS_KEYS.detail(variables.userId) });
+            queryClient.invalidateQueries({ queryKey: USERS_KEYS.lists() });
+        },
+    });
+};
+
+export const usePromoteUser = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (args: { id: number; data: CreatePromotionDto }) => usersApi.promoteUser(args),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: USERS_KEYS.detail(variables.id) });
             queryClient.invalidateQueries({ queryKey: USERS_KEYS.lists() });
         },
     });

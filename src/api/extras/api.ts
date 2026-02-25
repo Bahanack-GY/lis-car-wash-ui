@@ -1,9 +1,9 @@
 import { apiClient } from '@/lib/axios';
-import type { ExtraService, CreateExtraServiceDto, UpdateExtraServiceDto } from './types';
+import type { ExtraService, CreateExtraServiceDto, UpdateExtraServiceDto, ExtraFilters } from './types';
 
 export const extrasApi = {
-    findAll: async (): Promise<ExtraService[]> => {
-        const response = await apiClient.get<ExtraService[]>('/extras');
+    findAll: async (filters?: ExtraFilters): Promise<ExtraService[]> => {
+        const response = await apiClient.get<ExtraService[]>('/extras', { params: filters });
         return response.data;
     },
 

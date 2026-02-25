@@ -6,15 +6,21 @@ import {
   ArrowLeft, Phone, Mail, Shield, MapPin, Calendar, Loader2,
   Pencil, Save, X, ArrowRightLeft, UserCog, Clock, CheckCircle2, XCircle,
   Car, Award, CalendarDays, TrendingUp, AlertTriangle, Ban, UserX, RotateCcw, ShieldAlert,
+  Banknote, ClipboardList, CreditCard, Hash, ArrowUpCircle,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer,
   AreaChart, Area,
 } from 'recharts'
-import { useUser, useUpdateUser, useTransferStation, useUserPerformance, useAddSanction, useLiftSanction } from '@/api/users'
+import { useUser, useUpdateUser, useTransferStation, useUserPerformance, useAddSanction, useLiftSanction, usePromoteUser } from '@/api/users'
 import { useStations } from '@/api/stations'
-import type { Affectation, Sanction, SanctionType } from '@/api/users/types'
+import { useCaisseTransactions } from '@/api/caisse'
+import { useFichesPiste } from '@/api/fiches-piste'
+import type { Affectation, Sanction, SanctionType, Promotion } from '@/api/users/types'
+import type { Paiement } from '@/api/paiements/types'
+import type { FichePiste } from '@/api/fiches-piste/types'
+import type { DatePeriod } from '@/api/dashboard/types'
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } }
 const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } } }
@@ -45,6 +51,54 @@ interface PerfRecord {
   station?: { id: number; nom: string }
 }
 
+const periodTabs: { key: DatePeriod; label: string }[] = [
+  { key: 'week', label: 'Cette semaine' },
+  { key: 'month', label: 'Ce mois' },
+  { key: 'year', label: 'Année' },
+  { key: 'custom', label: 'Personnalisé' },
+]
+
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function computeDateRange(period: DatePeriod, customStart: string, customEnd: string): { startDate: string; endDate: string } {
+  const now = new Date()
+  const todayStr = toDateStr(now)
+
+  switch (period) {
+    case 'today':
+      return { startDate: todayStr, endDate: todayStr }
+    case 'week': {
+      const day = now.getDay()
+      const monday = new Date(now)
+      monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
+      return { startDate: toDateStr(monday), endDate: todayStr }
+    }
+    case 'month': {
+      const first = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { startDate: toDateStr(first), endDate: todayStr }
+    }
+    case 'year': {
+      const jan1 = new Date(now.getFullYear(), 0, 1)
+      return { startDate: toDateStr(jan1), endDate: todayStr }
+    }
+    case 'custom':
+      return {
+        startDate: customStart || todayStr,
+        endDate: customEnd || todayStr,
+      }
+  }
+}
+
+const periodLabels: Record<DatePeriod, string> = {
+  today: "aujourd'hui",
+  week: 'cette semaine',
+  month: 'ce mois',
+  year: 'cette année',
+  custom: 'la période sélectionnée',
+}
+
 export default function EmployeDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -52,16 +106,47 @@ export default function EmployeDetail() {
 
   const { data: user, isLoading, isError } = useUser(userId)
   const { data: stationsList } = useStations()
-  const { data: perfData } = useUserPerformance(userId)
   const updateUser = useUpdateUser()
   const transferStation = useTransferStation()
+
+  // Period state
+  const [period, setPeriod] = useState<DatePeriod>('month')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+
+  const dateRange = useMemo(
+    () => computeDateRange(period, customStart, customEnd),
+    [period, customStart, customEnd],
+  )
+
+  const { data: perfData, isFetching: perfFetching } = useUserPerformance(userId, undefined, dateRange.startDate, dateRange.endDate)
 
   const stations = stationsList || []
   const performances: PerfRecord[] = perfData || []
 
+  // Employee's current station (0 if not assigned yet / still loading)
+  const employeeStationId = user?.affectations?.find((a: Affectation) => a.statut === 'active')?.stationId || 0
+
+  // Caissière: fetch their transactions (only fires when stationId > 0)
+  const { data: caisseData, isFetching: caisseFetching } = useCaisseTransactions({
+    stationId: employeeStationId,
+    userId: userId,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    limit: 500,
+  })
+
+  // Contrôleur: fetch their fiches
+  const { data: fichesData, isFetching: fichesFetching } = useFichesPiste({
+    controleurId: userId,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    limit: 500,
+  })
+
   // Edit state
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState({ nom: '', prenom: '', email: '', telephone: '', role: '' as string })
+  const [editData, setEditData] = useState({ nom: '', prenom: '', email: '', telephone: '' })
 
   // Transfer state
   const [transferStationId, setTransferStationId] = useState<number | ''>('')
@@ -76,6 +161,12 @@ export default function EmployeDetail() {
   const [showLiftModal, setShowLiftModal] = useState(false)
   const [liftTargetId, setLiftTargetId] = useState<number | null>(null)
   const [liftNote, setLiftNote] = useState('')
+
+  // Promotion state
+  const promoteUser = usePromoteUser()
+  const [showPromoteModal, setShowPromoteModal] = useState(false)
+  const [promoteRole, setPromoteRole] = useState('')
+  const [promoteMotif, setPromoteMotif] = useState('')
 
   /* ── Performance computed stats ─────────────────── */
   const totalVehicles = useMemo(() =>
@@ -116,6 +207,78 @@ export default function EmployeDetail() {
     return vehiclesPerMonth.map(v => ({ name: v.name, bonus: v.bonus }))
   }, [vehiclesPerMonth])
 
+  /* ── Caissière computed stats ──────────────────── */
+  const caisseTransactions: Paiement[] = caisseData?.data || []
+  const totalEncaisse = useMemo(() =>
+    caisseTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.montant, 0), [caisseTransactions])
+  const incomeTxCount = useMemo(() =>
+    caisseTransactions.filter(t => t.type === 'income').length, [caisseTransactions])
+  const totalCaisseTx = caisseTransactions.length
+  const avgPerTx = incomeTxCount > 0 ? Math.round(totalEncaisse / incomeTxCount) : 0
+  const uniquePaymentMethods = useMemo(() =>
+    new Set(caisseTransactions.map(t => t.methode)).size, [caisseTransactions])
+
+  const caissePerMonth = useMemo(() => {
+    const map = new Map<string, number>()
+    caisseTransactions.filter(t => t.type === 'income').forEach(t => {
+      const d = new Date(t.createdAt)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      map.set(key, (map.get(key) || 0) + t.montant)
+    })
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([key, montant]) => {
+        const [year, month] = key.split('-')
+        const label = new Date(Number(year), Number(month) - 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
+        return { name: label, montant: Math.round(montant) }
+      })
+  }, [caisseTransactions])
+
+  const methodBreakdown = useMemo(() => {
+    const map = new Map<string, { count: number; total: number }>()
+    caisseTransactions.forEach(t => {
+      const existing = map.get(t.methode) || { count: 0, total: 0 }
+      existing.count += 1
+      existing.total += t.montant
+      map.set(t.methode, existing)
+    })
+    const labels: Record<string, string> = {
+      cash: 'Espèces', card: 'Carte', wave: 'Wave', orange_money: 'Orange Money', transfer: 'Virement',
+    }
+    return Array.from(map.entries()).map(([methode, data]) => ({
+      name: labels[methode] || methode,
+      transactions: data.count,
+      montant: Math.round(data.total),
+    }))
+  }, [caisseTransactions])
+
+  /* ── Contrôleur computed stats ─────────────────── */
+  const controleurFiches: FichePiste[] = fichesData?.data || []
+  const totalFiches = fichesData?.total || controleurFiches.length
+  const completedFiches = useMemo(() =>
+    controleurFiches.filter(f => f.statut === 'completed').length, [controleurFiches])
+  const openFiches = useMemo(() =>
+    controleurFiches.filter(f => f.statut === 'open').length, [controleurFiches])
+  const completionRate = totalFiches > 0 ? Math.round((completedFiches / totalFiches) * 100) : 0
+
+  const fichesPerMonth = useMemo(() => {
+    const map = new Map<string, number>()
+    controleurFiches.forEach(f => {
+      const d = new Date(f.date || f.createdAt)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      map.set(key, (map.get(key) || 0) + 1)
+    })
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([key, count]) => {
+        const [year, month] = key.split('-')
+        const label = new Date(Number(year), Number(month) - 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
+        return { name: label, fiches: count }
+      })
+  }, [controleurFiches])
+
   const startEditing = () => {
     if (!user) return
     setEditData({
@@ -123,7 +286,6 @@ export default function EmployeDetail() {
       prenom: user.prenom,
       email: user.email,
       telephone: user.telephone || '',
-      role: user.role,
     })
     setIsEditing(true)
   }
@@ -142,7 +304,6 @@ export default function EmployeDetail() {
           prenom: editData.prenom,
           email: editData.email,
           telephone: editData.telephone || undefined,
-          role: editData.role as any,
         },
       })
       toast.success('Employé mis à jour avec succès')
@@ -200,6 +361,19 @@ export default function EmployeDetail() {
     }
   }
 
+  const handlePromote = async () => {
+    if (!user || !promoteRole || !promoteMotif.trim()) return
+    try {
+      await promoteUser.mutateAsync({ id: user.id, data: { nouveauRole: promoteRole, motif: promoteMotif.trim() } })
+      toast.success('Promotion effectuée avec succès')
+      setShowPromoteModal(false)
+      setPromoteRole('')
+      setPromoteMotif('')
+    } catch {
+      toast.error('Erreur lors de la promotion')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[70vh] space-y-4">
@@ -227,6 +401,7 @@ export default function EmployeDetail() {
   const currentStation = activeAffectations[0]?.station?.nom
   const sanctions: Sanction[] = user.sanctions || []
   const activeSanctions = sanctions.filter(s => s.statut === 'active')
+  const promotions: Promotion[] = user.promotions || []
   const memberSince = new Date(user.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 
   // Ancienneté calculation
@@ -246,6 +421,25 @@ export default function EmployeDetail() {
     { label: 'Bonus total', value: `${Math.round(totalBonus).toLocaleString()} FCFA`, icon: Award, accent: 'bg-emerald-500/10 text-ok' },
     { label: 'Moy. / jour', value: `${avgPerDay} véh.`, icon: TrendingUp, accent: 'bg-amber-500/10 text-warn' },
   ]
+
+  const caissiereCards = [
+    { label: 'Total encaissé', value: `${totalEncaisse.toLocaleString()} FCFA`, icon: Banknote, accent: 'bg-emerald-500/10 text-ok' },
+    { label: 'Transactions', value: totalCaisseTx.toLocaleString(), icon: Hash, accent: 'bg-blue-500/10 text-info' },
+    { label: 'Moy. / transaction', value: `${avgPerTx.toLocaleString()} FCFA`, icon: TrendingUp, accent: 'bg-teal-500/10 text-accent' },
+    { label: 'Méthodes utilisées', value: uniquePaymentMethods.toString(), icon: CreditCard, accent: 'bg-amber-500/10 text-warn' },
+  ]
+
+  const controleurCards = [
+    { label: 'Fiches inspectées', value: totalFiches.toLocaleString(), icon: ClipboardList, accent: 'bg-blue-500/10 text-info' },
+    { label: 'Complétées', value: completedFiches.toLocaleString(), icon: CheckCircle2, accent: 'bg-emerald-500/10 text-ok' },
+    { label: 'En attente', value: openFiches.toLocaleString(), icon: Clock, accent: 'bg-amber-500/10 text-warn' },
+    { label: 'Taux complétion', value: `${completionRate}%`, icon: TrendingUp, accent: 'bg-teal-500/10 text-accent' },
+  ]
+
+  const roleCards = user.role === 'laveur' ? perfCards
+    : user.role === 'caissiere' ? caissiereCards
+    : user.role === 'controleur' ? controleurCards
+    : null
 
   // Stations available for transfer (exclude current)
   const transferableStations = stations.filter(s => !activeAffectations.some(a => a.stationId === s.id))
@@ -271,6 +465,12 @@ export default function EmployeDetail() {
               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${role.cls}`}>
                 <Shield className="w-3 h-3" /> {role.label}
               </span>
+              <button
+                onClick={() => { setPromoteRole(''); setPromoteMotif(''); setShowPromoteModal(true) }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-grape-wash text-grape border border-grape-line hover:bg-grape-wash/80 transition-colors"
+              >
+                <ArrowUpCircle className="w-3 h-3" /> Promouvoir
+              </button>
               <span className={`w-2.5 h-2.5 rounded-full ${user.actif !== false ? 'bg-emerald-500' : 'bg-red-500'}`} />
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-1.5">
@@ -291,6 +491,48 @@ export default function EmployeDetail() {
         </div>
       </motion.div>
 
+      {/* ── Period selector ──────────────────────────────── */}
+      <motion.div variants={rise} className="flex flex-wrap items-center gap-3">
+        <div className="flex bg-panel border border-edge rounded-xl p-1 shadow-sm">
+          {periodTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setPeriod(tab.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                period === tab.key
+                  ? 'bg-accent-wash text-accent'
+                  : 'text-ink-muted hover:text-ink'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {period === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="bg-panel border border-edge rounded-xl px-3 py-1.5 text-sm text-ink outline-none focus:border-teal-500 shadow-sm"
+            />
+            <span className="text-ink-muted text-sm">—</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="bg-panel border border-edge rounded-xl px-3 py-1.5 text-sm text-ink outline-none focus:border-teal-500 shadow-sm"
+            />
+          </div>
+        )}
+
+        <span className="text-xs text-ink-faded capitalize flex items-center gap-2">
+          {periodLabels[period]}
+          {(perfFetching || caisseFetching || fichesFetching) && <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-500" />}
+        </span>
+      </motion.div>
+
       {/* ── Stat cards ──────────────────────────────────── */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {statCards.map(s => {
@@ -307,83 +549,177 @@ export default function EmployeDetail() {
         })}
       </div>
 
-      {/* ── Performance stat cards ──────────────────────── */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {perfCards.map(s => {
-          const Icon = s.icon
-          return (
-            <motion.div key={s.label} variants={rise} className="bg-panel border border-edge rounded-2xl p-5 shadow-sm">
-              <div className={`p-2.5 rounded-xl w-fit ${s.accent} mb-3`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <p className="font-heading text-xl font-bold text-ink">{s.value}</p>
-              <p className="text-xs text-ink-faded mt-0.5">{s.label}</p>
-            </motion.div>
-          )
-        })}
-      </div>
+      {/* ── Role-specific stat cards ────────────────────── */}
+      {roleCards && (
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {roleCards.map(s => {
+            const Icon = s.icon
+            return (
+              <motion.div key={s.label} variants={rise} className="bg-panel border border-edge rounded-2xl p-5 shadow-sm">
+                <div className={`p-2.5 rounded-xl w-fit ${s.accent} mb-3`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <p className="font-heading text-xl font-bold text-ink">{s.value}</p>
+                <p className="text-xs text-ink-faded mt-0.5">{s.label}</p>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
 
-      {/* ── Performance charts ─────────────────────────── */}
-      {vehiclesPerMonth.length > 0 && (
+      {/* ── Laveur: Performance charts ──────────────────── */}
+      {user.role === 'laveur' && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {/* Vehicles washed per month */}
           <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-6 shadow-sm">
             <h3 className="font-heading font-semibold text-ink mb-1">Véhicules lavés</h3>
-            <p className="text-sm text-ink-faded mb-4">Performance mensuelle</p>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={vehiclesPerMonth}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
-                <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                <RechartsTooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(v: number, name: string) => {
-                    if (name === 'vehicules') return [`${v} véhicule${v > 1 ? 's' : ''}`, 'Lavés']
-                    return [v, name]
-                  }}
-                />
-                <Bar dataKey="vehicules" fill="#33cbcc" radius={[6, 6, 0, 0]} maxBarSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+            <p className="text-sm text-ink-faded mb-4">Performance sur la période</p>
+            {vehiclesPerMonth.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={vehiclesPerMonth}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
+                  <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <RechartsTooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v: number, name: string) => {
+                      if (name === 'vehicules') return [`${v} véhicule${v > 1 ? 's' : ''}`, 'Lavés']
+                      return [v, name]
+                    }}
+                  />
+                  <Bar dataKey="vehicules" fill="#33cbcc" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center border border-dashed border-edge rounded-xl">
+                <p className="text-sm text-ink-muted">Aucune donnée pour cette période</p>
+              </div>
+            )}
           </motion.div>
 
-          {/* Bonus over time */}
           <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-6 shadow-sm">
             <h3 className="font-heading font-semibold text-ink mb-1">Bonus estimé</h3>
-            <p className="text-sm text-ink-faded mb-4">Évolution mensuelle (FCFA)</p>
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={bonusPerMonth}>
-                <defs>
-                  <linearGradient id="gBonus" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
-                <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => v >= 1000 ? `${v / 1000}k` : String(v)} />
-                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${(v ?? 0).toLocaleString()} FCFA`, 'Bonus']} />
-                <Area type="monotone" dataKey="bonus" stroke="#10b981" strokeWidth={2.5} fill="url(#gBonus)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <p className="text-sm text-ink-faded mb-4">Évolution sur la période (FCFA)</p>
+            {bonusPerMonth.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={bonusPerMonth}>
+                  <defs>
+                    <linearGradient id="gBonus" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
+                  <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => v >= 1000 ? `${v / 1000}k` : String(v)} />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${(v ?? 0).toLocaleString()} FCFA`, 'Bonus']} />
+                  <Area type="monotone" dataKey="bonus" stroke="#10b981" strokeWidth={2.5} fill="url(#gBonus)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center border border-dashed border-edge rounded-xl">
+                <p className="text-sm text-ink-muted">Aucune donnée pour cette période</p>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
 
-      {/* ── Days worked per month ──────────────────────── */}
-      {vehiclesPerMonth.length > 0 && (
+      {user.role === 'laveur' && (
         <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-6 shadow-sm">
           <h3 className="font-heading font-semibold text-ink mb-1">Jours travaillés</h3>
           <p className="text-sm text-ink-faded mb-4">Nombre de jours de présence par mois</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={vehiclesPerMonth}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
-              <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-              <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v} jour${v > 1 ? 's' : ''}`, 'Travaillés']} />
-              <Bar dataKey="jours" fill="#283852" radius={[6, 6, 0, 0]} maxBarSize={40} />
-            </BarChart>
-          </ResponsiveContainer>
+          {vehiclesPerMonth.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={vehiclesPerMonth}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v} jour${v > 1 ? 's' : ''}`, 'Travaillés']} />
+                <Bar dataKey="jours" fill="#283852" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center border border-dashed border-edge rounded-xl">
+              <p className="text-sm text-ink-muted">Aucune donnée pour cette période</p>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Caissière: Revenue charts ────────────────────── */}
+      {user.role === 'caissiere' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-6 shadow-sm">
+            <h3 className="font-heading font-semibold text-ink mb-1">Recettes encaissées</h3>
+            <p className="text-sm text-ink-faded mb-4">Évolution sur la période (FCFA)</p>
+            {caissePerMonth.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={caissePerMonth}>
+                  <defs>
+                    <linearGradient id="gCaisse" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
+                  <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${(v ?? 0).toLocaleString()} FCFA`, 'Encaissé']} />
+                  <Area type="monotone" dataKey="montant" stroke="#10b981" strokeWidth={2.5} fill="url(#gCaisse)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center border border-dashed border-edge rounded-xl">
+                <p className="text-sm text-ink-muted">Aucune donnée pour cette période</p>
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-6 shadow-sm">
+            <h3 className="font-heading font-semibold text-ink mb-1">Méthodes de paiement</h3>
+            <p className="text-sm text-ink-faded mb-4">Répartition des transactions</p>
+            {methodBreakdown.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={methodBreakdown} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" horizontal={false} />
+                  <XAxis type="number" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} width={100} />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => {
+                    if (name === 'transactions') return [`${v} transaction${v > 1 ? 's' : ''}`, 'Nombre']
+                    return [`${(v ?? 0).toLocaleString()} FCFA`, 'Montant']
+                  }} />
+                  <Bar dataKey="transactions" fill="#33cbcc" radius={[0, 6, 6, 0]} maxBarSize={28} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center border border-dashed border-edge rounded-xl">
+                <p className="text-sm text-ink-muted">Aucune donnée pour cette période</p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+
+      {/* ── Contrôleur: Fiches charts ────────────────────── */}
+      {user.role === 'controleur' && (
+        <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-6 shadow-sm">
+          <h3 className="font-heading font-semibold text-ink mb-1">Fiches inspectées</h3>
+          <p className="text-sm text-ink-faded mb-4">Nombre de fiches par mois</p>
+          {fichesPerMonth.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={fichesPerMonth}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v} fiche${v > 1 ? 's' : ''}`, 'Inspectées']} />
+                <Bar dataKey="fiches" fill="#33cbcc" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center border border-dashed border-edge rounded-xl">
+              <p className="text-sm text-ink-muted">Aucune donnée pour cette période</p>
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -456,20 +792,6 @@ export default function EmployeDetail() {
                 onChange={(e) => setEditData({ ...editData, telephone: e.target.value })}
                 className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-light mb-1.5">Rôle</label>
-              <select
-                value={editData.role}
-                onChange={(e) => setEditData({ ...editData, role: e.target.value })}
-                className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
-              >
-                <option value="laveur">Laveur</option>
-                <option value="caissiere">Caissière</option>
-                <option value="controleur">Contrôleur</option>
-                <option value="manager">Manager</option>
-                <option value="super_admin">Super Admin</option>
-              </select>
             </div>
           </div>
         ) : (
@@ -634,50 +956,262 @@ export default function EmployeDetail() {
         </motion.div>
       )}
 
-      {/* ── Performance history table ───────────────────── */}
-      {performances.length > 0 && (
+      {/* ── Promotion history ───────────────────────────── */}
+      <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-divider flex items-center justify-between">
+          <h3 className="font-heading font-semibold text-ink flex items-center gap-2">
+            <ArrowUpCircle className="w-5 h-5 text-grape" /> Historique des promotions
+            {promotions.length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-grape-wash text-grape border border-grape-line">
+                {promotions.length}
+              </span>
+            )}
+          </h3>
+          <button
+            onClick={() => { setPromoteRole(''); setPromoteMotif(''); setShowPromoteModal(true) }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-grape hover:bg-grape-wash rounded-lg transition-colors"
+          >
+            <ArrowUpCircle className="w-3.5 h-3.5" /> Promouvoir
+          </button>
+        </div>
+
+        {promotions.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-ink-faded uppercase tracking-wider bg-inset">
+                  <th className="px-6 py-3 font-semibold">Ancien rôle</th>
+                  <th className="px-6 py-3 font-semibold">Nouveau rôle</th>
+                  <th className="px-6 py-3 font-semibold">Motif</th>
+                  <th className="px-6 py-3 font-semibold">Date</th>
+                  <th className="px-6 py-3 font-semibold">Par</th>
+                </tr>
+              </thead>
+              <tbody>
+                {promotions
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .map((p, i) => {
+                    const ancienCfg = roleCfg[p.ancienRole] || { label: p.ancienRole, cls: 'bg-raised text-ink-muted border-edge' }
+                    const nouveauCfg = roleCfg[p.nouveauRole] || { label: p.nouveauRole, cls: 'bg-raised text-ink-muted border-edge' }
+                    return (
+                      <tr key={p.id} className={`border-b border-divider last:border-0 ${i % 2 === 0 ? '' : 'bg-inset/50'} hover:bg-raised/50 transition-colors`}>
+                        <td className="px-6 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${ancienCfg.cls}`}>
+                            {ancienCfg.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${nouveauCfg.cls}`}>
+                            {nouveauCfg.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 text-ink max-w-[250px] truncate">{p.motif}</td>
+                        <td className="px-6 py-3 text-ink whitespace-nowrap">
+                          {new Date(p.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-6 py-3 text-ink-light text-xs">
+                          {p.promoteur ? `${p.promoteur.prenom} ${p.promoteur.nom}` : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center p-8">
+            <ArrowUpCircle className="w-8 h-8 mx-auto mb-2 text-ink-muted" />
+            <p className="text-sm text-ink-muted">Aucune promotion enregistrée</p>
+          </div>
+        )}
+      </motion.div>
+
+      {/* ── Laveur: Performance history table ──────────── */}
+      {user.role === 'laveur' && (
         <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-divider">
             <h3 className="font-heading font-semibold text-ink flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-accent" /> Historique des performances ({performances.length} jours)
             </h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-ink-faded uppercase tracking-wider bg-inset">
-                  <th className="px-6 py-3 font-semibold">Date</th>
-                  <th className="px-6 py-3 font-semibold">Station</th>
-                  <th className="px-6 py-3 font-semibold text-right">Véhicules</th>
-                  <th className="px-6 py-3 font-semibold text-right">Bonus</th>
-                </tr>
-              </thead>
-              <tbody>
-                {performances.slice(0, 50).map((p, i) => (
-                  <tr key={p.id} className={`border-b border-divider last:border-0 ${i % 2 === 0 ? '' : 'bg-inset/50'} hover:bg-raised/50 transition-colors`}>
-                    <td className="px-6 py-3 text-ink whitespace-nowrap">
-                      {new Date(p.date).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-6 py-3 text-ink">
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-ink-muted" />
-                        {p.station?.nom || `Station #${p.stationId}`}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-right font-semibold text-ink">
-                      {Number(p.vehiculesLaves) || 0}
-                    </td>
-                    <td className="px-6 py-3 text-right font-semibold text-ok whitespace-nowrap">
-                      {Math.round(Number(p.bonusEstime) || 0).toLocaleString()} FCFA
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {performances.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-ink-faded uppercase tracking-wider bg-inset">
+                      <th className="px-6 py-3 font-semibold">Date</th>
+                      <th className="px-6 py-3 font-semibold">Station</th>
+                      <th className="px-6 py-3 font-semibold text-right">Véhicules</th>
+                      <th className="px-6 py-3 font-semibold text-right">Bonus</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performances.slice(0, 50).map((p, i) => (
+                      <tr key={p.id} className={`border-b border-divider last:border-0 ${i % 2 === 0 ? '' : 'bg-inset/50'} hover:bg-raised/50 transition-colors`}>
+                        <td className="px-6 py-3 text-ink whitespace-nowrap">
+                          {new Date(p.date).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-6 py-3 text-ink">
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-ink-muted" />
+                            {p.station?.nom || `Station #${p.stationId}`}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 text-right font-semibold text-ink">
+                          {Number(p.vehiculesLaves) || 0}
+                        </td>
+                        <td className="px-6 py-3 text-right font-semibold text-ok whitespace-nowrap">
+                          {Math.round(Number(p.bonusEstime) || 0).toLocaleString()} FCFA
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {performances.length > 50 && (
+                <div className="px-6 py-3 text-center text-xs text-ink-muted border-t border-divider">
+                  Affichage des 50 derniers jours sur {performances.length}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center p-8">
+              <p className="text-sm text-ink-muted">Aucune performance enregistrée pour cette période</p>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Caissière: Transaction history table ─────────── */}
+      {user.role === 'caissiere' && (
+        <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-divider">
+            <h3 className="font-heading font-semibold text-ink flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-accent" /> Historique des transactions ({caisseTransactions.length})
+            </h3>
           </div>
-          {performances.length > 50 && (
-            <div className="px-6 py-3 text-center text-xs text-ink-muted border-t border-divider">
-              Affichage des 50 derniers jours sur {performances.length}
+          {caisseTransactions.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-ink-faded uppercase tracking-wider bg-inset">
+                      <th className="px-6 py-3 font-semibold">Date</th>
+                      <th className="px-6 py-3 font-semibold">Méthode</th>
+                      <th className="px-6 py-3 font-semibold">Description</th>
+                      <th className="px-6 py-3 font-semibold">Type</th>
+                      <th className="px-6 py-3 font-semibold text-right">Montant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {caisseTransactions.slice(0, 50).map((t, i) => {
+                      const methodeLabels: Record<string, string> = {
+                        cash: 'Espèces', card: 'Carte', wave: 'Wave', orange_money: 'Orange Money', transfer: 'Virement',
+                      }
+                      return (
+                        <tr key={t.id} className={`border-b border-divider last:border-0 ${i % 2 === 0 ? '' : 'bg-inset/50'} hover:bg-raised/50 transition-colors`}>
+                          <td className="px-6 py-3 text-ink whitespace-nowrap">
+                            {new Date(t.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="px-6 py-3 text-ink">
+                            <span className="flex items-center gap-1.5">
+                              <CreditCard className="w-3.5 h-3.5 text-ink-muted" />
+                              {methodeLabels[t.methode] || t.methode}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-ink max-w-[200px] truncate">{t.description || '—'}</td>
+                          <td className="px-6 py-3">
+                            <span className={`px-2 py-0.5 rounded-lg text-xs font-medium border ${
+                              t.type === 'income'
+                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                : 'bg-red-500/10 text-red-600 border-red-500/20'
+                            }`}>
+                              {t.type === 'income' ? 'Recette' : 'Dépense'}
+                            </span>
+                          </td>
+                          <td className={`px-6 py-3 text-right font-semibold whitespace-nowrap ${t.type === 'income' ? 'text-ok' : 'text-red-500'}`}>
+                            {t.type === 'income' ? '+' : '-'}{t.montant.toLocaleString()} FCFA
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {caisseTransactions.length > 50 && (
+                <div className="px-6 py-3 text-center text-xs text-ink-muted border-t border-divider">
+                  Affichage des 50 dernières transactions sur {caisseTransactions.length}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center p-8">
+              <p className="text-sm text-ink-muted">Aucune transaction pour cette période</p>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Contrôleur: Fiches history table ──────────────── */}
+      {user.role === 'controleur' && (
+        <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-divider">
+            <h3 className="font-heading font-semibold text-ink flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-accent" /> Fiches inspectées ({totalFiches})
+            </h3>
+          </div>
+          {controleurFiches.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-ink-faded uppercase tracking-wider bg-inset">
+                      <th className="px-6 py-3 font-semibold">Date</th>
+                      <th className="px-6 py-3 font-semibold">N° Fiche</th>
+                      <th className="px-6 py-3 font-semibold">Véhicule</th>
+                      <th className="px-6 py-3 font-semibold">Client</th>
+                      <th className="px-6 py-3 font-semibold">Type</th>
+                      <th className="px-6 py-3 font-semibold">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {controleurFiches.slice(0, 50).map((f, i) => {
+                      const statusCfg: Record<string, { label: string; cls: string }> = {
+                        open: { label: 'Ouverte', cls: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
+                        in_progress: { label: 'En cours', cls: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+                        completed: { label: 'Complétée', cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+                      }
+                      const st = statusCfg[f.statut] || statusCfg.open
+                      return (
+                        <tr key={f.id} className={`border-b border-divider last:border-0 ${i % 2 === 0 ? '' : 'bg-inset/50'} hover:bg-raised/50 transition-colors`}>
+                          <td className="px-6 py-3 text-ink whitespace-nowrap">
+                            {new Date(f.date || f.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="px-6 py-3 text-ink font-medium">{f.numero || `#${f.id}`}</td>
+                          <td className="px-6 py-3 text-ink">{f.vehicle?.immatriculation || '—'}</td>
+                          <td className="px-6 py-3 text-ink">{f.client?.nom || '—'}</td>
+                          <td className="px-6 py-3 text-ink">{f.typeLavage?.nom || '—'}</td>
+                          <td className="px-6 py-3">
+                            <span className={`px-2 py-0.5 rounded-lg text-xs font-medium border ${st.cls}`}>
+                              {st.label}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {controleurFiches.length > 50 && (
+                <div className="px-6 py-3 text-center text-xs text-ink-muted border-t border-divider">
+                  Affichage des 50 dernières fiches sur {totalFiches}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center p-8">
+              <p className="text-sm text-ink-muted">Aucune fiche pour cette période</p>
             </div>
           )}
         </motion.div>
@@ -931,6 +1465,84 @@ export default function EmployeDetail() {
                   className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors disabled:opacity-70 text-sm flex items-center gap-2"
                 >
                   {liftSanction.isPending ? 'Traitement...' : 'Lever la sanction'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Promotion modal ────────────────────────────── */}
+      <AnimatePresence>
+        {showPromoteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPromoteModal(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-panel border border-edge rounded-2xl shadow-xl p-6"
+            >
+              <h3 className="font-heading font-bold text-lg text-ink flex items-center gap-2 mb-4">
+                <ArrowUpCircle className="w-5 h-5 text-grape" /> Promouvoir l'employé
+              </h3>
+
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-grape-wash border border-grape-line mb-4">
+                <Shield className="w-5 h-5 text-grape shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <p className="font-semibold text-grape">Rôle actuel : {role.label}</p>
+                  <p className="text-ink-muted mt-0.5">Le rôle de l'employé sera modifié et un historique sera conservé.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-ink-light mb-1.5">Nouveau rôle</label>
+                  <select
+                    value={promoteRole}
+                    onChange={(e) => setPromoteRole(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-inset border border-outline rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                  >
+                    <option value="">— Sélectionner un rôle —</option>
+                    {Object.entries(roleCfg)
+                      .filter(([key]) => key !== user.role)
+                      .map(([key, cfg]) => (
+                        <option key={key} value={key}>{cfg.label}</option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink-light mb-1.5">Motif de la promotion</label>
+                  <textarea
+                    value={promoteMotif}
+                    onChange={(e) => setPromoteMotif(e.target.value)}
+                    placeholder="Décrivez la raison de la promotion..."
+                    rows={3}
+                    className="w-full px-3 py-2.5 bg-inset border border-outline rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowPromoteModal(false)}
+                  className="px-4 py-2 font-medium text-ink-light hover:text-ink transition-colors text-sm"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handlePromote}
+                  disabled={!promoteRole || !promoteMotif.trim() || promoteUser.isPending}
+                  className="px-5 py-2 bg-grape hover:bg-grape/90 text-white font-medium rounded-xl transition-colors disabled:opacity-70 text-sm flex items-center gap-2"
+                >
+                  {promoteUser.isPending ? 'Promotion...' : 'Confirmer la promotion'}
                 </button>
               </div>
             </motion.div>

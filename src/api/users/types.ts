@@ -8,6 +8,37 @@ export interface Affectation {
     station?: { id: number; nom: string };
 }
 
+export type SanctionType = 'avertissement' | 'suspension' | 'renvoi';
+export type SanctionStatusType = 'active' | 'levee';
+
+export interface Sanction {
+    id: number;
+    userId: number;
+    type: SanctionType;
+    motif: string;
+    dateDebut: string;
+    dateFin?: string;
+    statut: SanctionStatusType;
+    createdBy: number;
+    noteLevee?: string;
+    createur?: { id: number; nom: string; prenom: string };
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Promotion {
+    id: number;
+    userId: number;
+    ancienRole: string;
+    nouveauRole: string;
+    motif: string;
+    date: string;
+    createdBy: number;
+    promoteur?: { id: number; nom: string; prenom: string };
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface User {
     id: number;
     nom: string;
@@ -18,6 +49,7 @@ export interface User {
     actif: boolean;
     affectations?: Affectation[];
     sanctions?: Sanction[];
+    promotions?: Promotion[];
     createdAt: string;
     updatedAt: string;
 }
@@ -39,7 +71,7 @@ export interface CreateUserDto {
     role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur';
 }
 
-export interface UpdateUserDto extends Partial<CreateUserDto> { }
+export interface UpdateUserDto extends Partial<Omit<CreateUserDto, 'role'>> { }
 
 export interface AssignStationDto {
     stationId: number;
@@ -58,24 +90,6 @@ export interface UserFilters {
     limit?: number;
 }
 
-export type SanctionType = 'avertissement' | 'suspension' | 'renvoi';
-export type SanctionStatusType = 'active' | 'levee';
-
-export interface Sanction {
-    id: number;
-    userId: number;
-    type: SanctionType;
-    motif: string;
-    dateDebut: string;
-    dateFin?: string;
-    statut: SanctionStatusType;
-    createdBy: number;
-    noteLevee?: string;
-    createur?: { id: number; nom: string; prenom: string };
-    createdAt: string;
-    updatedAt: string;
-}
-
 export interface CreateSanctionDto {
     type: SanctionType;
     motif: string;
@@ -83,4 +97,9 @@ export interface CreateSanctionDto {
 
 export interface LiftSanctionDto {
     noteLevee?: string;
+}
+
+export interface CreatePromotionDto {
+    nouveauRole: string;
+    motif: string;
 }

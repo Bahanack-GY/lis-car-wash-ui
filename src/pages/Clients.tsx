@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useClients, useCreateClient, useCreateVehicle } from '@/api/clients'
 import type { CreateClientDto, CreateVehicleDto, Client } from '@/api/clients/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
@@ -15,6 +16,7 @@ const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transiti
 const inputCls = 'w-full px-3 py-2.5 bg-inset border border-outline rounded-xl text-sm text-ink placeholder-ink-muted outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all'
 
 export default function Clients() {
+  const { selectedStationId } = useAuth()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -35,6 +37,7 @@ export default function Clients() {
     search: debouncedSearch || undefined,
     page,
     limit: 12,
+    stationId: selectedStationId || undefined,
   })
 
   const clientsList: Client[] = clientsData?.data || []
@@ -213,6 +216,7 @@ export default function Clients() {
         {isModalOpen && (
           <CreateClientModal
             onClose={() => setIsModalOpen(false)}
+            stationId={selectedStationId}
           />
         )}
       </AnimatePresence>
@@ -223,7 +227,7 @@ export default function Clients() {
 /* ================================================================
    CREATE CLIENT MODAL
    ================================================================ */
-function CreateClientModal({ onClose }: { onClose: () => void }) {
+function CreateClientModal({ onClose, stationId }: { onClose: () => void; stationId: number | null }) {
   const createClient = useCreateClient()
   const createVehicle = useCreateVehicle()
 
@@ -236,7 +240,7 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const newClient = await createClient.mutateAsync(formData)
+      const newClient = await createClient.mutateAsync({ ...formData, stationId: stationId || undefined })
 
       if (addVehicle && vehicleData.immatriculation.trim()) {
         await createVehicle.mutateAsync({ id: newClient.id, data: vehicleData })

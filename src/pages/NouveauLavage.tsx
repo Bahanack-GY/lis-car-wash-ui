@@ -28,6 +28,7 @@ import type { Vehicle } from '@/api/clients'
 import { useUsers } from '@/api/users'
 import { useCreateNouveauLavage } from '@/api/fiches-piste'
 import { useCoupons } from '@/api/coupons'
+import { useAuth } from '@/contexts/AuthContext'
 
 /* ================================================================
    ICONS MAPPING
@@ -70,14 +71,15 @@ const slideVariants = {
 
 export default function NouveauLavage() {
   const navigate = useNavigate()
+  const { selectedStationId } = useAuth()
 
   /* ================================================================
      QUERIES & MUTATIONS
      ================================================================ */
-  const { data: washTypesData } = useWashTypes()
-  const { data: extrasData } = useExtras()
-  const { data: clientsData } = useClients()
-  const { data: usersData } = useUsers()
+  const { data: washTypesData } = useWashTypes(selectedStationId ? { stationId: selectedStationId } : undefined)
+  const { data: extrasData } = useExtras(selectedStationId ? { stationId: selectedStationId } : undefined)
+  const { data: clientsData } = useClients(selectedStationId ? { stationId: selectedStationId } : undefined)
+  const { data: usersData } = useUsers(selectedStationId ? { stationId: selectedStationId } : undefined)
   const createClient = useCreateClient()
   const createVehicle = useCreateVehicle()
   const createLavage = useCreateNouveauLavage()
@@ -231,6 +233,7 @@ export default function NouveauLavage() {
           nom: newName,
           contact: newPhone,
           email: newEmail,
+          stationId: selectedStationId || undefined,
         })
         finalClientId = newC.id
       }
@@ -255,7 +258,7 @@ export default function NouveauLavage() {
 
       // Create Fiche + Coupon in one shot
       const result = await createLavage.mutateAsync({
-        stationId: 1,
+        stationId: selectedStationId!,
         clientId: Number(finalClientId),
         vehicleId: Number(finalVehicleId),
         typeLavageId: Number(washId),

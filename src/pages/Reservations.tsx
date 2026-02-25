@@ -16,9 +16,10 @@ import {
   ChevronRight,
   AlertCircle,
   User,
+  UserPlus,
 } from 'lucide-react'
 import { useReservations, useCreateReservation, useUpdateReservation } from '@/api/reservations'
-import { useClients, useClientVehicles } from '@/api/clients'
+import { useClients, useClientVehicles, useCreateClient, useCreateVehicle } from '@/api/clients'
 import { useWashTypes } from '@/api/wash-types'
 import { useStations } from '@/api/stations'
 import { useAuth } from '@/contexts/AuthContext'
@@ -345,6 +346,8 @@ function CreateReservationModal({
   const { data: clientsData } = useClients()
   const { data: washTypes } = useWashTypes()
   const { data: stationsData } = useStations()
+  const createClient = useCreateClient()
+  const createVehicle = useCreateVehicle()
 
   const clientsList = clientsData?.data || []
   const washTypesList = washTypes || []
@@ -357,6 +360,11 @@ function CreateReservationModal({
   const [selectedWashTypeId, setSelectedWashTypeId] = useState<number | null>(null)
   const [selectedStationId, setSelectedStationId] = useState<number | null>(stationId)
   const [dateTime, setDateTime] = useState('')
+
+  /* ── Inline client creation ────────────────────────── */
+  const [showCreateClient, setShowCreateClient] = useState(false)
+  const [newClient, setNewClient] = useState({ nom: '', contact: '', email: '' })
+  const [newVehicle, setNewVehicle] = useState({ immatriculation: '', brand: '', modele: '', color: '' })
 
   /* ── Vehicles for selected client ──────────────────── */
   const { data: clientVehicles, isLoading: vehiclesLoading } = useClientVehicles(selectedClientId ?? 0)
@@ -391,6 +399,37 @@ function CreateReservationModal({
       onClose()
     } catch {
       toast.error('Erreur lors de la création')
+    }
+  }
+
+  /* ── Create client + vehicle then auto-select ──────── */
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newClient.nom.trim() || !newVehicle.immatriculation.trim()) return
+    try {
+      const client = await createClient.mutateAsync({
+        nom: newClient.nom,
+        contact: newClient.contact || undefined,
+        email: newClient.email || undefined,
+        stationId: selectedStationId || undefined,
+      })
+      const vehicle = await createVehicle.mutateAsync({
+        id: client.id,
+        data: {
+          immatriculation: newVehicle.immatriculation,
+          brand: newVehicle.brand || undefined,
+          modele: newVehicle.modele || undefined,
+          color: newVehicle.color || undefined,
+        },
+      })
+      setSelectedClientId(client.id)
+      setSelectedVehicleId(vehicle.id)
+      setShowCreateClient(false)
+      setNewClient({ nom: '', contact: '', email: '' })
+      setNewVehicle({ immatriculation: '', brand: '', modele: '', color: '' })
+      toast.success(`${client.nom} créé avec le véhicule ${vehicle.immatriculation}`)
+    } catch {
+      toast.error('Erreur lors de la création du client')
     }
   }
 
@@ -431,7 +470,141 @@ function CreateReservationModal({
             <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
               <User className="w-3.5 h-3.5" /> Client *
             </label>
-            {!selectedClient ? (
+
+            {showCreateClient ? (
+              /* ── Inline create client + vehicle form ────── */
+              <form onSubmit={handleCreateClient} className="space-y-3 bg-inset rounded-xl p-4 border border-divider">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium text-ink flex items-center gap-1.5">
+                    <UserPlus className="w-4 h-4 text-accent" /> Nouveau client
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateClient(false)}
+                    className="text-xs text-ink-muted hover:text-ink transition-colors"
+                  >
+                    Retour
+                  </button>
+                </div>
+
+                {createClient.isError && (
+                  <div className="p-2.5 bg-red-500/10 text-red-500 rounded-lg text-xs border border-red-500/20">
+                    Erreur lors de la création du client. Vérifiez les informations.
+                  </div>
+                )}
+
+                {/* Client info */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-ink-light mb-1">Nom complet *</label>
+                    <input
+                      required
+                      type="text"
+                      value={newClient.nom}
+                      onChange={(e) => setNewClient({ ...newClient, nom: e.target.value })}
+                      className={inputCls}
+                      placeholder="Moussa Diallo"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-light mb-1">Téléphone</label>
+                    <input
+                      type="text"
+                      value={newClient.contact}
+                      onChange={(e) => setNewClient({ ...newClient, contact: e.target.value })}
+                      className={inputCls}
+                      placeholder="+221 77 123 45 67"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-light mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                    className={inputCls}
+                    placeholder="client@email.com"
+                  />
+                </div>
+
+                {/* Vehicle info */}
+                <div className="pt-3 border-t border-divider">
+                  <p className="text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Car className="w-3.5 h-3.5" /> Véhicule *
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-ink-light mb-1">Immatriculation *</label>
+                      <input
+                        required
+                        type="text"
+                        value={newVehicle.immatriculation}
+                        onChange={(e) => setNewVehicle({ ...newVehicle, immatriculation: e.target.value })}
+                        className={inputCls}
+                        placeholder="DK-1234-AB"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-light mb-1">Marque</label>
+                      <input
+                        type="text"
+                        value={newVehicle.brand}
+                        onChange={(e) => setNewVehicle({ ...newVehicle, brand: e.target.value })}
+                        className={inputCls}
+                        placeholder="Toyota"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-light mb-1">Modèle</label>
+                      <input
+                        type="text"
+                        value={newVehicle.modele}
+                        onChange={(e) => setNewVehicle({ ...newVehicle, modele: e.target.value })}
+                        className={inputCls}
+                        placeholder="Corolla"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-light mb-1">Couleur</label>
+                      <input
+                        type="text"
+                        value={newVehicle.color}
+                        onChange={(e) => setNewVehicle({ ...newVehicle, color: e.target.value })}
+                        className={inputCls}
+                        placeholder="Blanc"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateClient(false)}
+                    className="px-3 py-2 text-sm font-medium text-ink-light hover:text-ink transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createClient.isPending || createVehicle.isPending}
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-70"
+                  >
+                    {createClient.isPending || createVehicle.isPending ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                        Création...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-3.5 h-3.5" /> Créer le client
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : !selectedClient ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 bg-inset border border-outline rounded-xl px-4 py-2.5 focus-within:border-teal-500/40 transition-colors">
                   <Search className="w-4 h-4 text-ink-muted" />
@@ -459,10 +632,23 @@ function CreateReservationModal({
                       </div>
                     </button>
                   ))}
-                  {filteredClients.length === 0 && (
-                    <p className="text-sm text-ink-muted text-center py-4">Aucun client trouvé</p>
+                  {filteredClients.length === 0 && clientSearch.trim() && (
+                    <div className="text-center py-3 space-y-2">
+                      <p className="text-sm text-ink-muted">Aucun client trouvé pour « {clientSearch} »</p>
+                    </div>
                   )}
                 </div>
+                {/* Always show create button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateClient(true)
+                    if (clientSearch.trim()) setNewClient({ ...newClient, nom: clientSearch.trim() })
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-accent hover:bg-accent-wash rounded-xl transition-colors border border-dashed border-accent-line"
+                >
+                  <UserPlus className="w-4 h-4" /> Créer un nouveau client
+                </button>
               </div>
             ) : (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-accent-wash border border-accent-line">
@@ -484,7 +670,7 @@ function CreateReservationModal({
           </div>
 
           {/* ── Vehicle selector (shown when client selected) ── */}
-          {selectedClientId && (
+          {selectedClientId && !showCreateClient && (
             <div>
               <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
                 <Car className="w-3.5 h-3.5" /> Véhicule *
@@ -528,75 +714,79 @@ function CreateReservationModal({
           )}
 
           {/* ── Wash type selector ──────────────────────── */}
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
-              <Droplets className="w-3.5 h-3.5" /> Type de lavage *
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {washTypesList.map(w => {
-                const sel = selectedWashTypeId === w.id
-                return (
-                  <button
-                    key={w.id}
-                    onClick={() => setSelectedWashTypeId(w.id)}
-                    className={`text-left p-3 rounded-xl transition-all ${
-                      sel ? 'bg-accent-wash border-2 border-teal-500' : 'bg-inset border border-divider hover:border-outline'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-ink">{w.nom}</p>
-                      {sel && <Check className="w-4 h-4 text-accent" />}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs font-semibold text-accent">{w.prixBase.toLocaleString()} FCFA</span>
-                      {w.dureeEstimee > 0 && <span className="text-xs text-ink-muted">{w.dureeEstimee} min</span>}
-                    </div>
-                  </button>
-                )
-              })}
+          {!showCreateClient && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
+                <Droplets className="w-3.5 h-3.5" /> Type de lavage *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {washTypesList.map(w => {
+                  const sel = selectedWashTypeId === w.id
+                  return (
+                    <button
+                      key={w.id}
+                      onClick={() => setSelectedWashTypeId(w.id)}
+                      className={`text-left p-3 rounded-xl transition-all ${
+                        sel ? 'bg-accent-wash border-2 border-teal-500' : 'bg-inset border border-divider hover:border-outline'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-ink">{w.nom}</p>
+                        {sel && <Check className="w-4 h-4 text-accent" />}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs font-semibold text-accent">{w.prixBase.toLocaleString()} FCFA</span>
+                        {w.dureeEstimee > 0 && <span className="text-xs text-ink-muted">{w.dureeEstimee} min</span>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Station + Date/Time ─────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
-                <MapPin className="w-3.5 h-3.5" /> Station
-              </label>
-              {isSuperAdmin ? (
-                <select
-                  value={selectedStationId || ''}
-                  onChange={(e) => setSelectedStationId(Number(e.target.value) || null)}
+          {!showCreateClient && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
+                  <MapPin className="w-3.5 h-3.5" /> Station
+                </label>
+                {isSuperAdmin ? (
+                  <select
+                    value={selectedStationId || ''}
+                    onChange={(e) => setSelectedStationId(Number(e.target.value) || null)}
+                    className={inputCls}
+                  >
+                    <option value="">Sélectionner une station</option>
+                    {stationsList.map(s => (
+                      <option key={s.id} value={s.id}>{s.nom}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-inset border border-outline rounded-xl text-sm text-ink">
+                    <MapPin className="w-4 h-4 text-ink-muted" />
+                    {stationsList.find(s => s.id === selectedStationId)?.nom || 'Station assignée'}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
+                  <CalendarDays className="w-3.5 h-3.5" /> Date & Heure *
+                </label>
+                <input
+                  type="datetime-local"
+                  value={dateTime}
+                  onChange={(e) => setDateTime(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
                   className={inputCls}
-                >
-                  <option value="">Sélectionner une station</option>
-                  {stationsList.map(s => (
-                    <option key={s.id} value={s.id}>{s.nom}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-inset border border-outline rounded-xl text-sm text-ink">
-                  <MapPin className="w-4 h-4 text-ink-muted" />
-                  {stationsList.find(s => s.id === selectedStationId)?.nom || 'Station assignée'}
-                </div>
-              )}
+                />
+              </div>
             </div>
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">
-                <CalendarDays className="w-3.5 h-3.5" /> Date & Heure *
-              </label>
-              <input
-                type="datetime-local"
-                value={dateTime}
-                onChange={(e) => setDateTime(e.target.value)}
-                min={new Date().toISOString().slice(0, 16)}
-                className={inputCls}
-              />
-            </div>
-          </div>
+          )}
 
           {/* ── Summary card ────────────────────────────── */}
-          {canSubmit && (
+          {canSubmit && !showCreateClient && (
             <div className="bg-inset rounded-xl p-4 border border-divider">
               <p className="text-xs font-semibold text-ink-faded uppercase tracking-wider mb-2">Résumé</p>
               <div className="grid grid-cols-2 gap-y-2 text-sm">
@@ -619,34 +809,36 @@ function CreateReservationModal({
         </div>
 
         {/* ── Footer ──────────────────────────────────── */}
-        <div className="px-6 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 font-medium text-ink-light hover:text-ink transition-colors text-sm"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit || onCreate.isPending}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              canSubmit
-                ? 'bg-gradient-to-r from-teal-600 to-teal-500 text-white shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30'
-                : 'bg-dim/50 text-ink-muted cursor-not-allowed'
-            }`}
-          >
-            {onCreate.isPending ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Création...
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4" /> Réserver
-              </>
-            )}
-          </button>
-        </div>
+        {!showCreateClient && (
+          <div className="px-6 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 font-medium text-ink-light hover:text-ink transition-colors text-sm"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!canSubmit || onCreate.isPending}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                canSubmit
+                  ? 'bg-gradient-to-r from-teal-600 to-teal-500 text-white shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30'
+                  : 'bg-dim/50 text-ink-muted cursor-not-allowed'
+              }`}
+            >
+              {onCreate.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Création...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" /> Réserver
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   )

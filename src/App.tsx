@@ -16,8 +16,11 @@ import Employes from '@/pages/Employes'
 import EmployeDetail from '@/pages/EmployeDetail'
 import Stations from '@/pages/Stations'
 import TypesLavage from '@/pages/TypesLavage'
+import ServicesAdditionnels from '@/pages/ServicesAdditionnels'
+import Incidents from '@/pages/Incidents'
 import NouveauLavage from '@/pages/NouveauLavage'
 import SelectStation from '@/pages/SelectStation'
+import GlobalDashboard from '@/pages/GlobalDashboard'
 import MonEspace from '@/pages/MonEspace'
 import Unauthorized from '@/pages/Unauthorized'
 
@@ -29,6 +32,7 @@ export default function App() {
         {/* Public */}
         <Route path="/" element={<Login />} />
         <Route path="/select-station" element={<SelectStation />} />
+        <Route path="/global-dashboard" element={<GlobalDashboard />} />
 
         {/* Protected — inside Layout */}
         <Route element={<Layout />}>
@@ -115,6 +119,18 @@ export default function App() {
           <Route path="/types-lavage" element={
             <ProtectedRoute roles={['super_admin', 'manager']}>
               <TypesLavage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/services-additionnels" element={
+            <ProtectedRoute roles={['super_admin', 'manager']}>
+              <ServicesAdditionnels />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/incidents" element={
+            <ProtectedRoute roles={['super_admin', 'manager']}>
+              <Incidents />
             </ProtectedRoute>
           } />
 

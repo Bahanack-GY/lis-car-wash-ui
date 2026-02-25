@@ -6,6 +6,7 @@ import { UserCog, Search, Plus, Phone, Mail, Award, Car, Shield, Filter, Chevron
 import { useUsers, useCreateUser, useAssignStation } from '@/api/users'
 import { useStations } from '@/api/stations'
 import type { CreateUserDto } from '@/api/users/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
@@ -21,6 +22,8 @@ const roleCfg: Record<string, { label: string; cls: string }> = {
 const roleFilter = ['Tous', 'Admin', 'Manager', 'Contrôleur', 'Caissière', 'Laveur']
 
 export default function Employes() {
+  const { selectedStationId: authStationId, user: authUser } = useAuth()
+  const isSuperAdmin = authUser?.role === 'super_admin'
   const [search, setSearch] = useState('')
   const [roleTab, setRoleTab] = useState('Tous')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -36,7 +39,7 @@ export default function Employes() {
   const navigate = useNavigate()
 
   // Queries & Mutations
-  const { data: usersData, isLoading, isError } = useUsers()
+  const { data: usersData, isLoading, isError } = useUsers(authStationId ? { stationId: authStationId } : undefined)
   const { data: stationsList } = useStations()
   const createUser = useCreateUser()
   const assignStation = useAssignStation()
@@ -328,8 +331,8 @@ export default function Employes() {
                       <option value="laveur">Laveur</option>
                       <option value="caissiere">Caissière</option>
                       <option value="controleur">Contrôleur</option>
-                      <option value="manager">Manager</option>
-                      <option value="super_admin">Super Admin</option>
+                      {isSuperAdmin && <option value="manager">Manager</option>}
+                      {isSuperAdmin && <option value="super_admin">Super Admin</option>}
                     </select>
                   </div>
                 </div>
@@ -337,9 +340,10 @@ export default function Employes() {
                 {/* Station assignment */}
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-medium text-ink-light mb-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Station
+                    <MapPin className="w-3.5 h-3.5" /> Station {formData.role === 'manager' && '*'}
                   </label>
                   <select
+                    required={formData.role === 'manager'}
                     value={selectedStationId}
                     onChange={(e) => setSelectedStationId(e.target.value ? Number(e.target.value) : '')}
                     className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
@@ -349,6 +353,9 @@ export default function Employes() {
                       <option key={s.id} value={s.id}>{s.nom} — {s.town}</option>
                     ))}
                   </select>
+                  {formData.role === 'manager' && !selectedStationId && (
+                    <p className="text-xs text-warn mt-1">Un manager doit être assigné à une station</p>
+                  )}
                 </div>
 
                 <div>

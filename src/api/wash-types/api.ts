@@ -1,9 +1,9 @@
 import { apiClient } from '@/lib/axios';
-import type { WashType, CreateWashTypeDto, UpdateWashTypeDto } from './types';
+import type { WashType, CreateWashTypeDto, UpdateWashTypeDto, WashTypeFilters } from './types';
 
 export const washTypesApi = {
-    findAll: async (): Promise<WashType[]> => {
-        const response = await apiClient.get<WashType[]>('/wash-types');
+    findAll: async (filters?: WashTypeFilters): Promise<WashType[]> => {
+        const response = await apiClient.get<WashType[]>('/wash-types', { params: filters });
         return response.data;
     },
 

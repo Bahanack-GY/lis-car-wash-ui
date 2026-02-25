@@ -5,6 +5,7 @@ import { Package, Search, Plus, AlertTriangle, Filter, ShoppingCart, Droplets, W
 import { useProduits, useCreateProduit } from '@/api/produits'
 import { useMouvementsStock } from '@/api/mouvements-stock'
 import type { Produit, CreateProduitDto } from '@/api/produits/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
@@ -19,6 +20,7 @@ const categories: { key: Category; label: string; icon: typeof Droplets }[] = [
 ]
 
 export default function Inventaire() {
+  const { selectedStationId } = useAuth()
   const [search, setSearch] = useState('')
   const [cat, setCat] = useState<Category>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -33,7 +35,7 @@ export default function Inventaire() {
   })
 
   // Queries
-  const { data: produitsData, isLoading: prodLoading } = useProduits()
+  const { data: produitsData, isLoading: prodLoading } = useProduits(selectedStationId ? { stationId: selectedStationId } : undefined)
   const { data: mvtsData, isLoading: mvtsLoading } = useMouvementsStock()
   const createProduit = useCreateProduit()
 
@@ -50,7 +52,7 @@ export default function Inventaire() {
     e.preventDefault()
     try {
       const payload: CreateProduitDto = {
-        stationId: 1, // fallback
+        stationId: selectedStationId!,
         nom: formData.nom || '',
         categorie: formData.categorie as any,
         quantiteStock: Number(formData.quantiteStock),

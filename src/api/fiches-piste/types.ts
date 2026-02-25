@@ -46,8 +46,11 @@ export interface UpdateFichePisteDto extends Partial<CreateFichePisteDto> {
 export interface FichePisteFilters {
     stationId?: number;
     clientId?: number;
+    controleurId?: number;
     statut?: 'open' | 'in_progress' | 'completed';
     date?: string;
+    startDate?: string; // YYYY-MM-DD
+    endDate?: string; // YYYY-MM-DD
     page?: number;
     limit?: number;
 }

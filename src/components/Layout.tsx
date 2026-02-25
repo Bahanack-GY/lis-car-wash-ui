@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, CalendarDays, ClipboardList, Ticket, CreditCard,
   Users, Package, UserCog, Building2, Search, Bell, LogOut,
-  ChevronLeft, Menu, Plus, Sun, Moon, Star, Droplets,
+  ChevronLeft, Menu, Plus, Sun, Moon, Star, Droplets, Sparkles, MapPin, Check, ChevronsUpDown, Clock, AlertTriangle,
 } from 'lucide-react'
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth, type UserRole } from '@/contexts/AuthContext'
+import { useStations } from '@/api/stations'
+import { useActiveIncidentsByStation } from '@/api/incidents'
 
 interface NavItem {
   path: string
@@ -26,7 +28,9 @@ const allNavItems: NavItem[] = [
   { path: '/caisse',        label: 'Caisse',            icon: CreditCard,      roles: ['super_admin', 'manager', 'caissiere'] },
   { path: '/clients',       label: 'Clients',           icon: Users,           roles: ['super_admin', 'manager', 'controleur', 'caissiere'] },
   { path: '/inventaire',    label: 'Inventaire',        icon: Package,         roles: ['super_admin', 'manager'] },
+  { path: '/incidents',     label: 'Incidents',          icon: AlertTriangle,   roles: ['super_admin', 'manager'] },
   { path: '/types-lavage',  label: 'Types de Lavage',   icon: Droplets,        roles: ['super_admin', 'manager'] },
+  { path: '/services-additionnels', label: 'Services Add.', icon: Sparkles,    roles: ['super_admin', 'manager'] },
   { path: '/employes',      label: 'Employés',          icon: UserCog,         roles: ['super_admin', 'manager'] },
   { path: '/stations',      label: 'Stations',          icon: Building2,       roles: ['super_admin'] },
   { path: '/mon-espace',    label: 'Mon Espace',        icon: Star,            roles: ['laveur'] },
@@ -43,10 +47,51 @@ const roleLabel: Record<UserRole, string> = {
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [stationDropdownOpen, setStationDropdownOpen] = useState(false)
+  const [stationSearch, setStationSearch] = useState('')
+  const stationDropdownRef = useRef<HTMLDivElement>(null)
+  const stationSearchRef = useRef<HTMLInputElement>(null)
   const location = useLocation()
   const navigate = useNavigate()
   const { isDark, toggle } = useTheme()
-  const { user, logout, hasRole } = useAuth()
+  const { user, logout, hasRole, selectedStationId, setStation } = useAuth()
+  const { data: stationsList } = useStations()
+  const stations = stationsList || []
+  const { data: incidentStatusMap } = useActiveIncidentsByStation()
+  const currentStation = stations.find(s => s.id === selectedStationId)
+
+  const filteredStations = useMemo(() => {
+    if (!stationSearch.trim()) return stations
+    const q = stationSearch.toLowerCase()
+    return stations.filter(
+      (s) =>
+        s.nom.toLowerCase().includes(q) ||
+        s.town.toLowerCase().includes(q) ||
+        s.adresse.toLowerCase().includes(q),
+    )
+  }, [stations, stationSearch])
+
+  const activeStations = useMemo(() => filteredStations.filter(s => s.status === 'active'), [filteredStations])
+  const otherStations = useMemo(() => filteredStations.filter(s => s.status !== 'active'), [filteredStations])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (stationDropdownRef.current && !stationDropdownRef.current.contains(e.target as Node)) {
+        setStationDropdownOpen(false)
+        setStationSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Focus search when dropdown opens
+  useEffect(() => {
+    if (stationDropdownOpen && stationSearchRef.current) {
+      setTimeout(() => stationSearchRef.current?.focus(), 50)
+    }
+  }, [stationDropdownOpen])
 
   const navItems = allNavItems.filter((item) =>
     user ? item.roles.includes(user.role as UserRole) : false
@@ -164,6 +209,152 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {/* Station Switcher */}
+        {stations.length > 0 && (
+          <div className="px-3 py-2 border-t border-edge" ref={stationDropdownRef}>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setStationDropdownOpen(!stationDropdownOpen)
+                  if (stationDropdownOpen) setStationSearch('')
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200 ${
+                  stationDropdownOpen
+                    ? 'border-teal-500/40 bg-accent-wash'
+                    : 'border-edge bg-inset hover:border-outline'
+                }`}
+              >
+                <div className="relative flex-shrink-0">
+                  <MapPin className={`w-[20px] h-[20px] ${currentStation ? 'text-accent' : 'text-ink-muted'}`} />
+                  {currentStation?.status === 'active' && (() => {
+                    const iStatus = selectedStationId ? incidentStatusMap?.[selectedStationId] : undefined
+                    const dotColor = iStatus?.hasStoppingIncident
+                      ? 'bg-red-500'
+                      : iStatus?.hasNonStoppingIncident
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                    return <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 ${dotColor} rounded-full border border-panel`} />
+                  })()}
+                </div>
+                <AnimatePresence>
+                  {!collapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="flex-1 min-w-0 text-left overflow-hidden"
+                    >
+                      <p className="text-xs font-medium text-ink-faded uppercase tracking-wider leading-none mb-0.5">Station</p>
+                      <p className="text-sm font-medium text-ink truncate">
+                        {currentStation?.nom || 'Aucune station'}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {!collapsed && (
+                  <ChevronsUpDown className="w-4 h-4 text-ink-muted flex-shrink-0" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {stationDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className={`absolute bottom-full mb-1 bg-panel border border-edge rounded-xl shadow-xl shadow-black/10 overflow-hidden z-50 ${
+                      collapsed ? 'left-0 w-64' : 'left-0 right-0'
+                    }`}
+                  >
+                    {/* Search */}
+                    {stations.length > 5 && (
+                      <div className="p-2 border-b border-edge">
+                        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-inset rounded-lg border border-edge focus-within:border-teal-500/40 transition-colors">
+                          <Search className="w-3.5 h-3.5 text-ink-muted flex-shrink-0" />
+                          <input
+                            ref={stationSearchRef}
+                            type="text"
+                            value={stationSearch}
+                            onChange={(e) => setStationSearch(e.target.value)}
+                            placeholder="Rechercher..."
+                            className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none w-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-1.5 max-h-72 overflow-y-auto">
+                      {filteredStations.length === 0 ? (
+                        <p className="text-xs text-ink-muted text-center py-3">Aucun résultat</p>
+                      ) : (
+                        <>
+                          {/* Active stations */}
+                          {activeStations.map((s) => {
+                            const isSelected = s.id === selectedStationId
+                            const sIncident = incidentStatusMap?.[s.id]
+                            const dotColor = sIncident?.hasStoppingIncident
+                              ? 'bg-red-500'
+                              : sIncident?.hasNonStoppingIncident
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-500'
+                            return (
+                              <button
+                                key={s.id}
+                                onClick={() => {
+                                  setStation(s.id)
+                                  setStationDropdownOpen(false)
+                                  setStationSearch('')
+                                }}
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${
+                                  isSelected
+                                    ? 'bg-accent-wash text-accent'
+                                    : 'text-ink-faded hover:text-ink hover:bg-raised'
+                                }`}
+                              >
+                                <span className="relative flex h-2 w-2 flex-shrink-0">
+                                  <span className={`relative inline-flex rounded-full h-2 w-2 ${dotColor}`} />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{s.nom}</p>
+                                  <p className="text-xs text-ink-muted truncate">{s.town}</p>
+                                </div>
+                                {isSelected && <Check className="w-4 h-4 text-accent flex-shrink-0" />}
+                              </button>
+                            )
+                          })}
+
+                          {/* Separator */}
+                          {activeStations.length > 0 && otherStations.length > 0 && (
+                            <div className="my-1 mx-3 border-t border-edge" />
+                          )}
+
+                          {/* Inactive / upcoming stations */}
+                          {otherStations.map((s) => (
+                            <div
+                              key={s.id}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left opacity-50 cursor-not-allowed"
+                            >
+                              <Clock className="w-3.5 h-3.5 text-ink-muted flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-ink-muted truncate">{s.nom}</p>
+                                <p className="text-xs text-ink-muted truncate">{s.town}</p>
+                              </div>
+                              <span className="text-[10px] text-ink-muted font-medium uppercase">
+                                {s.status === 'upcoming' ? 'Bientôt' : 'Inactive'}
+                              </span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
 
         {/* Collapse */}
         <div className="hidden lg:block px-3 py-2 border-t border-edge">

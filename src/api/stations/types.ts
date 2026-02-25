@@ -6,6 +6,8 @@ export interface Station {
     contact?: string;
     status: 'active' | 'upcoming' | 'inactive';
     activeEmployeesCount?: number;
+    employeeCount?: number;
+    managerName?: string;
     createdAt: string;
     updatedAt: string;
 }

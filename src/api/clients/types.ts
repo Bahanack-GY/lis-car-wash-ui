@@ -1,5 +1,6 @@
 export interface Client {
     id: number;
+    stationId?: number;
     nom: string;
     contact?: string;
     email?: string;
@@ -24,6 +25,7 @@ export interface CreateClientDto {
     nom: string;
     contact?: string;
     email?: string;
+    stationId?: number;
 }
 
 export interface UpdateClientDto extends Partial<CreateClientDto> { }
@@ -65,6 +67,7 @@ export interface CreateSubscriptionDto {
 
 export interface ClientFilters {
     search?: string;
+    stationId?: number;
     page?: number;
     limit?: number;
 }

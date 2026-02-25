@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Droplets, Plus, Search, Clock, Banknote, Sparkles, Zap, X, Pencil, ListFilter } from 'lucide-react'
 import { useWashTypes, useCreateWashType, useUpdateWashType } from '@/api/wash-types'
 import type { WashType, CreateWashTypeDto, UpdateWashTypeDto } from '@/api/wash-types/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
@@ -39,12 +40,13 @@ function formatDuration(minutes: number | string) {
 const emptyForm: CreateWashTypeDto = { nom: '', particularites: '', prixBase: 0, dureeEstimee: 0 }
 
 export default function TypesLavage() {
+  const { selectedStationId } = useAuth()
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingType, setEditingType] = useState<WashType | null>(null)
   const [formData, setFormData] = useState<CreateWashTypeDto>(emptyForm)
 
-  const { data: washTypesData, isLoading, isError } = useWashTypes()
+  const { data: washTypesData, isLoading, isError } = useWashTypes(selectedStationId ? { stationId: selectedStationId } : undefined)
   const createWashType = useCreateWashType()
   const updateWashType = useUpdateWashType()
 
@@ -110,7 +112,7 @@ export default function TypesLavage() {
         if (formData.dureeEstimee !== (Number(editingType.dureeEstimee) || 0)) changes.dureeEstimee = formData.dureeEstimee
         await updateWashType.mutateAsync({ id: editingType.id, data: changes })
       } else {
-        await createWashType.mutateAsync(formData)
+        await createWashType.mutateAsync({ ...formData, stationId: selectedStationId || undefined })
       }
       closeModal()
     } catch (error) {

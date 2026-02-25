@@ -1,30 +1,96 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import {
-  Building2, MapPin, Users, ArrowRight, LogOut, Sun, Moon, Clock,
+  Building2, MapPin, Users, ArrowRight, LogOut, Sun, Moon, Clock, Search, AlertTriangle, UserCog, BarChart3,
 } from 'lucide-react'
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStations } from '@/api/stations'
+import { useActiveIncidentsByStation } from '@/api/incidents'
 
-const stagger = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.1 } },
-}
-const rise = {
-  hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
-}
+type StatusFilter = 'all' | 'active' | 'inactive' | 'upcoming'
+type IncidentFilter = 'all' | 'no_incident' | 'incident' | 'stopped'
+
+const statusTabs: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'Toutes' },
+  { key: 'active', label: 'Actives' },
+  { key: 'inactive', label: 'Inactives' },
+  { key: 'upcoming', label: 'À venir' },
+]
+
+const incidentTabs: { key: IncidentFilter; label: string }[] = [
+  { key: 'all', label: 'Tous' },
+  { key: 'no_incident', label: 'Sans incident' },
+  { key: 'incident', label: 'Avec incident' },
+  { key: 'stopped', label: 'Activité arrêtée' },
+]
 
 export default function SelectStation() {
   const navigate = useNavigate()
   const { isDark, toggle } = useTheme()
   const { user, logout, setStation, defaultPath } = useAuth()
   const { data: stationsData, isLoading, isError } = useStations()
+  const { data: incidentStatusMap } = useActiveIncidentsByStation()
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [incidentFilter, setIncidentFilter] = useState<IncidentFilter>('all')
+  const [townFilter, setTownFilter] = useState<string>('all')
 
   const stationsList = stationsData || []
+
+  // Extract unique towns for the dropdown
+  const towns = useMemo(() => {
+    const set = new Set(stationsList.map(s => s.town))
+    return Array.from(set).sort()
+  }, [stationsList])
+
+  const filtered = useMemo(() => {
+    let list = stationsList
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      list = list.filter((s) => s.status === statusFilter)
+    }
+
+    // Town filter
+    if (townFilter !== 'all') {
+      list = list.filter((s) => s.town === townFilter)
+    }
+
+    // Incident filter
+    if (incidentFilter !== 'all' && incidentStatusMap) {
+      list = list.filter((s) => {
+        const iStatus = incidentStatusMap[s.id]
+        if (incidentFilter === 'no_incident') return !iStatus
+        if (incidentFilter === 'incident') return !!iStatus
+        if (incidentFilter === 'stopped') return iStatus?.hasStoppingIncident
+        return true
+      })
+    }
+
+    // Search filter
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(
+        (s) =>
+          s.nom.toLowerCase().includes(q) ||
+          s.adresse.toLowerCase().includes(q) ||
+          s.town.toLowerCase().includes(q) ||
+          (s.managerName && s.managerName.toLowerCase().includes(q)),
+      )
+    }
+
+    return list
+  }, [stationsList, search, statusFilter, townFilter, incidentFilter, incidentStatusMap])
+
+  // Counts per status for filter badges
+  const statusCounts = useMemo(() => ({
+    all: stationsList.length,
+    active: stationsList.filter(s => s.status === 'active').length,
+    inactive: stationsList.filter(s => s.status === 'inactive').length,
+    upcoming: stationsList.filter(s => s.status === 'upcoming').length,
+  }), [stationsList])
 
   // Non-super_admin should never reach this page — redirect immediately
   useEffect(() => {
@@ -93,9 +159,10 @@ export default function SelectStation() {
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex items-center justify-center px-6 pb-16">
-        <motion.div variants={stagger} initial="hidden" animate="show" className="w-full max-w-3xl">
-          <motion.div variants={rise} className="text-center mb-10">
+      <div className="flex-1 px-6 sm:px-10 pb-16">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8 pt-6">
             <div className="w-14 h-14 rounded-2xl bg-accent-wash border border-accent-line flex items-center justify-center mx-auto mb-5">
               <Building2 className="w-7 h-7 text-accent" />
             </div>
@@ -105,7 +172,96 @@ export default function SelectStation() {
             <p className="text-ink-faded mt-3 max-w-md mx-auto">
               Sélectionnez la station sur laquelle vous travaillez aujourd'hui.
             </p>
-          </motion.div>
+            <button
+              onClick={() => navigate('/global-dashboard')}
+              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-panel border border-edge rounded-xl text-sm font-medium text-ink hover:border-teal-500 hover:shadow-md transition-all duration-200"
+            >
+              <BarChart3 className="w-4 h-4 text-accent" />
+              Tableau de bord global
+            </button>
+          </div>
+
+          {/* Search + Filters */}
+          <div className="max-w-2xl mx-auto mb-6 space-y-3">
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Rechercher par nom, ville, adresse ou manager..."
+                className="w-full pl-10 pr-4 py-2.5 bg-panel border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+              />
+            </div>
+
+            {/* Filters row */}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {/* Status filter tabs */}
+              <div className="flex bg-panel border border-edge rounded-xl p-1 shadow-sm">
+                {statusTabs.map((tab) => {
+                  const count = statusCounts[tab.key]
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setStatusFilter(tab.key)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                        statusFilter === tab.key
+                          ? 'bg-accent-wash text-accent'
+                          : 'text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      {tab.label}
+                      {count > 0 && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                          statusFilter === tab.key
+                            ? 'bg-accent/10 text-accent'
+                            : 'bg-raised text-ink-muted'
+                        }`}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Town filter */}
+              {towns.length > 1 && (
+                <select
+                  value={townFilter}
+                  onChange={(e) => setTownFilter(e.target.value)}
+                  className="bg-panel border border-edge rounded-xl px-3 py-2 text-sm font-medium text-ink outline-none focus:border-teal-500 shadow-sm cursor-pointer"
+                >
+                  <option value="all">Toutes les villes</option>
+                  {towns.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Incident filter */}
+              <div className="flex bg-panel border border-edge rounded-xl p-1 shadow-sm">
+                {incidentTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setIncidentFilter(tab.key)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      incidentFilter === tab.key
+                        ? tab.key === 'stopped'
+                          ? 'bg-red-500/10 text-red-600'
+                          : tab.key === 'incident'
+                            ? 'bg-amber-500/10 text-amber-600'
+                            : 'bg-accent-wash text-accent'
+                        : 'text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
           {isLoading ? (
             <div className="flex justify-center p-8">
@@ -115,41 +271,61 @@ export default function SelectStation() {
             <div className="p-4 bg-red-500/10 text-red-500 rounded-xl text-center">
               Erreur lors du chargement des stations.
             </div>
-          ) : stationsList.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="text-center text-ink-muted p-8 border border-dashed border-divider rounded-xl">
-              Aucune station disponible.
+              {search || statusFilter !== 'all'
+                ? 'Aucune station ne correspond à vos critères.'
+                : 'Aucune station disponible.'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {stationsList.map((s) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((s) => {
                 const isOpen = s.status === 'active'
+                const iStatus = incidentStatusMap?.[s.id]
+                const hasStopping = isOpen && iStatus?.hasStoppingIncident
+                const hasNonStopping = isOpen && !hasStopping && iStatus?.hasNonStoppingIncident
+                const hoverBorder = hasStopping
+                  ? 'hover:border-red-500 hover:shadow-red-500/10'
+                  : hasNonStopping
+                    ? 'hover:border-amber-500 hover:shadow-amber-500/10'
+                    : 'hover:border-teal-500 hover:shadow-teal-500/10'
+                const empCount = (s as any).employeeCount ?? s.activeEmployeesCount ?? 0
                 return (
-                  <motion.button
+                  <button
                     key={s.id}
-                    variants={rise}
                     onClick={() => select(s.id, s.status)}
                     disabled={!isOpen}
-                    whileHover={isOpen ? { scale: 1.02, y: -2 } : undefined}
-                    whileTap={isOpen ? { scale: 0.98 } : undefined}
                     className={`relative text-left p-6 rounded-2xl border-2 transition-all duration-200 group flex flex-col ${
                       isOpen
-                        ? 'bg-panel border-edge hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/10 cursor-pointer'
+                        ? `bg-panel border-edge ${hoverBorder} hover:shadow-lg hover:-translate-y-0.5 cursor-pointer`
                         : 'bg-inset border-edge opacity-60 cursor-not-allowed'
                     }`}
                   >
                     <div className="absolute top-5 right-5">
                       {isOpen ? (
-                        <span className="flex items-center gap-1.5 text-xs font-medium text-ok">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        hasStopping ? (
+                          <span className="flex items-center gap-1.5 text-xs font-medium text-red-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            Activité arrêtée
                           </span>
-                          Active
-                        </span>
+                        ) : hasNonStopping ? (
+                          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            Incident en cours
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5 text-xs font-medium text-ok">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                            </span>
+                            Active
+                          </span>
+                        )
                       ) : (
                         <span className="flex items-center gap-1.5 text-xs font-medium text-ink-muted">
                           <Clock className="w-3 h-3" />
-                          {s.status === 'upcoming' ? 'Bientôt' : 'Inactive'}
+                          {s.status === 'upcoming' ? 'À venir' : 'Inactive'}
                         </span>
                       )}
                     </div>
@@ -164,30 +340,37 @@ export default function SelectStation() {
                       {s.adresse}, {s.town}
                     </p>
 
-                    {isOpen && (
-                      <div className="flex items-center gap-4 pt-4 border-t border-divider mt-auto w-full">
-                        <div className="flex items-center gap-1.5 text-sm text-ink-faded">
-                          <Users className="w-3.5 h-3.5 text-ink-muted" />
-                          <span className="font-semibold text-ink">{(s as any).employesActifs ?? 0}</span> employés
-                        </div>
+                    {/* Manager + employees */}
+                    <div className="flex items-center gap-4 pt-4 border-t border-divider mt-auto w-full">
+                      <div className="flex items-center gap-1.5 text-sm text-ink-faded">
+                        <Users className="w-3.5 h-3.5 text-ink-muted" />
+                        <span className="font-semibold text-ink">{empCount}</span> employé{Number(empCount) !== 1 ? 's' : ''}
                       </div>
-                    )}
+                      {s.managerName && (
+                        <div className="flex items-center gap-1.5 text-sm text-ink-faded ml-auto">
+                          <UserCog className="w-3.5 h-3.5 text-ink-muted" />
+                          <span className="font-medium text-ink truncate max-w-[120px]">{s.managerName}</span>
+                        </div>
+                      )}
+                    </div>
 
                     {isOpen && (
-                      <div className="absolute bottom-5 right-5 w-8 h-8 rounded-full bg-raised group-hover:bg-teal-500 flex items-center justify-center transition-all duration-200">
+                      <div className={`absolute bottom-5 right-5 w-8 h-8 rounded-full bg-raised flex items-center justify-center transition-all duration-200 ${
+                        hasStopping ? 'group-hover:bg-red-500' : hasNonStopping ? 'group-hover:bg-amber-500' : 'group-hover:bg-teal-500'
+                      }`}>
                         <ArrowRight className="w-4 h-4 text-ink-muted group-hover:text-white transition-colors" />
                       </div>
                     )}
-                  </motion.button>
+                  </button>
                 )
               })}
             </div>
           )}
 
-          <motion.p variants={rise} className="text-center text-xs text-ink-muted mt-8">
+          <p className="text-center text-xs text-ink-muted mt-8">
             Vous pouvez changer de station à tout moment depuis le menu
-          </motion.p>
-        </motion.div>
+          </p>
+        </div>
       </div>
     </div>
   )

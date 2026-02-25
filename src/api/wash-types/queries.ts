@@ -1,16 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { washTypesApi } from './api';
-import type { CreateWashTypeDto, UpdateWashTypeDto } from './types';
+import type { CreateWashTypeDto, UpdateWashTypeDto, WashTypeFilters } from './types';
 
 export const WASH_TYPES_KEYS = {
     all: ['wash-types'] as const,
     lists: () => [...WASH_TYPES_KEYS.all, 'list'] as const,
+    list: (filters: string) => [...WASH_TYPES_KEYS.lists(), { filters }] as const,
 };
 
-export const useWashTypes = () => {
+export const useWashTypes = (filters?: WashTypeFilters) => {
     return useQuery({
-        queryKey: WASH_TYPES_KEYS.lists(),
-        queryFn: () => washTypesApi.findAll(),
+        queryKey: WASH_TYPES_KEYS.list(JSON.stringify(filters || {})),
+        queryFn: () => washTypesApi.findAll(filters),
     });
 };
 

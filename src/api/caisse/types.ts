@@ -21,7 +21,10 @@ export interface CaisseSummaryFilters {
 
 export interface CaisseTransactionFilters {
     stationId: number;
+    userId?: number;
     date?: string; // YYYY-MM-DD
+    startDate?: string; // YYYY-MM-DD
+    endDate?: string; // YYYY-MM-DD
     type?: 'income' | 'expense';
     page?: number;
     limit?: number;

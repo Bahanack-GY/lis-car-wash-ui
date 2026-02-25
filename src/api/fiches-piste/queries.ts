@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { fichesPisteApi } from './api';
 import type { CreateFichePisteDto, UpdateFichePisteDto, FichePisteFilters, CreateNouveauLavageDto } from './types';
 
@@ -14,6 +14,7 @@ export const useFichesPiste = (filters?: FichePisteFilters) => {
     return useQuery({
         queryKey: FICHES_PISTE_KEYS.list(JSON.stringify(filters || {})),
         queryFn: () => fichesPisteApi.findAll(filters),
+        placeholderData: keepPreviousData,
     });
 };
 

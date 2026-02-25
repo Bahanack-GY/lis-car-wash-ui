@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { caisseApi } from './api';
 import type {
     CaisseSummaryFilters,
@@ -25,6 +25,7 @@ export const useCaisseTransactions = (filters: CaisseTransactionFilters) => {
         queryKey: CAISSE_KEYS.transactions(JSON.stringify(filters)),
         queryFn: () => caisseApi.getTransactions(filters),
         enabled: !!filters.stationId,
+        placeholderData: keepPreviousData,
     });
 };
 

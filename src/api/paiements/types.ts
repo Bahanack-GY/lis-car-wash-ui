@@ -41,6 +41,7 @@ export interface CreatePaiementDto {
 
 export interface TransactionFilters {
     stationId: number;
+    userId?: number;
     date?: string;
     type?: 'income' | 'expense';
     page?: number;
