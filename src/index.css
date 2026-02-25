@@ -1,0 +1,226 @@
+@import "tailwindcss";
+
+/* ── Class-based dark mode ───────────────────────── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Semantic design tokens ──────────────────────── */
+@theme {
+  /* Surfaces */
+  --color-surface: var(--c-surface);
+  --color-panel: var(--c-panel);
+  --color-inset: var(--c-inset);
+  --color-raised: var(--c-raised);
+  --color-dim: var(--c-dim);
+
+  /* Borders */
+  --color-edge: var(--c-edge);
+  --color-divider: var(--c-divider);
+  --color-outline: var(--c-outline);
+
+  /* Text */
+  --color-ink: var(--c-ink);
+  --color-ink-light: var(--c-ink-light);
+  --color-ink-faded: var(--c-ink-faded);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-ghost: var(--c-ink-ghost);
+
+  /* Accent (teal) */
+  --color-accent: var(--c-accent);
+  --color-accent-bold: var(--c-accent-bold);
+  --color-accent-wash: var(--c-accent-wash);
+  --color-accent-line: var(--c-accent-line);
+  --color-accent-ring: var(--c-accent-ring);
+
+  /* Status: success (emerald) */
+  --color-ok: var(--c-ok);
+  --color-ok-wash: var(--c-ok-wash);
+  --color-ok-line: var(--c-ok-line);
+
+  /* Status: warning (amber) */
+  --color-warn: var(--c-warn);
+  --color-warn-wash: var(--c-warn-wash);
+  --color-warn-line: var(--c-warn-line);
+
+  /* Status: danger (red) */
+  --color-bad: var(--c-bad);
+  --color-bad-wash: var(--c-bad-wash);
+  --color-bad-line: var(--c-bad-line);
+
+  /* Status: info (blue) */
+  --color-info: var(--c-info);
+  --color-info-wash: var(--c-info-wash);
+  --color-info-line: var(--c-info-line);
+
+  /* Status: purple */
+  --color-grape: var(--c-grape);
+  --color-grape-wash: var(--c-grape-wash);
+  --color-grape-line: var(--c-grape-line);
+
+  /* Sidebar (dark) */
+  --color-navy-800: #162132;
+  --color-navy-700: #1a2b3d;
+  --color-navy-600: #243447;
+  --color-navy-500: #283852;
+
+  /* Teal (raw – for gradients, dots) */
+  --color-teal-700: #1a8080;
+  --color-teal-600: #2ab0b0;
+  --color-teal-500: #33cbcc;
+  --color-teal-400: #5dd8d8;
+
+  /* Fonts */
+  --font-heading: "Sora", sans-serif;
+  --font-body: "Plus Jakarta Sans", sans-serif;
+}
+
+/* ── Light (default) ─────────────────────────────── */
+:root {
+  --c-surface: #f1f5f9;
+  --c-panel: #ffffff;
+  --c-inset: #f9fafb;
+  --c-raised: #f3f4f6;
+  --c-dim: #e5e7eb;
+
+  --c-edge: #e5e7eb;
+  --c-divider: #f3f4f6;
+  --c-outline: #d1d5db;
+
+  --c-ink: #111827;
+  --c-ink-light: #4b5563;
+  --c-ink-faded: #6b7280;
+  --c-ink-muted: #9ca3af;
+  --c-ink-ghost: #d1d5db;
+
+  --c-accent: #2ab0b0;
+  --c-accent-bold: #1a8080;
+  --c-accent-wash: #f0fdfa;
+  --c-accent-line: #99f6e4;
+  --c-accent-ring: #5eead4;
+
+  --c-ok: #047857;
+  --c-ok-wash: #ecfdf5;
+  --c-ok-line: #a7f3d0;
+
+  --c-warn: #b45309;
+  --c-warn-wash: #fffbeb;
+  --c-warn-line: #fde68a;
+
+  --c-bad: #b91c1c;
+  --c-bad-wash: #fef2f2;
+  --c-bad-line: #fecaca;
+
+  --c-info: #1d4ed8;
+  --c-info-wash: #eff6ff;
+  --c-info-line: #bfdbfe;
+
+  --c-grape: #7e22ce;
+  --c-grape-wash: #faf5ff;
+  --c-grape-line: #e9d5ff;
+}
+
+/* ── Dark ────────────────────────────────────────── */
+.dark {
+  --c-surface: #0f1923;
+  --c-panel: #162132;
+  --c-inset: #1a2b3d;
+  --c-raised: #1e3044;
+  --c-dim: #243447;
+
+  --c-edge: #243447;
+  --c-divider: #1e3044;
+  --c-outline: #2a3f56;
+
+  --c-ink: #ffffff;
+  --c-ink-light: #b0c0d0;
+  --c-ink-faded: #8899aa;
+  --c-ink-muted: #5a7090;
+  --c-ink-ghost: #3a5070;
+
+  --c-accent: #5dd8d8;
+  --c-accent-bold: #88e5e5;
+  --c-accent-wash: #132d2d;
+  --c-accent-line: #1a4040;
+  --c-accent-ring: #1f5555;
+
+  --c-ok: #34d399;
+  --c-ok-wash: #0f2820;
+  --c-ok-line: #153a2c;
+
+  --c-warn: #fbbf24;
+  --c-warn-wash: #1e1c11;
+  --c-warn-line: #2a2714;
+
+  --c-bad: #f87171;
+  --c-bad-wash: #201316;
+  --c-bad-line: #2d181c;
+
+  --c-info: #60a5fa;
+  --c-info-wash: #131e2e;
+  --c-info-line: #18263b;
+
+  --c-grape: #c084fc;
+  --c-grape-wash: #1a162a;
+  --c-grape-line: #211c34;
+}
+
+/* ── Base ─────────────────────────────────────────── */
+body {
+  font-family: var(--font-body);
+  background-color: var(--c-surface);
+  color: var(--c-ink);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* ── Scrollbar ────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-dim); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-ink-muted); }
+
+/* ── Wave animation (Login) ───────────────────────── */
+.wave-wrap { position: absolute; bottom: 0; left: 0; width: 200%; height: 160px; }
+.wave-shape {
+  position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-linear-gradient(90deg, transparent, transparent 25%, rgba(51,203,204,0.06) 25%, rgba(51,203,204,0.06) 50%);
+  border-radius: 40% 60% 40% 60%;
+  animation: waveMove 8s ease-in-out infinite;
+}
+.wave-shape:nth-child(2) { opacity: 0.5; animation-delay: -3s; animation-duration: 10s; }
+.wave-shape:nth-child(3) { opacity: 0.3; animation-delay: -5s; animation-duration: 12s; }
+@keyframes waveMove {
+  0%, 100% { transform: translateX(0) scaleY(1); }
+  50%      { transform: translateX(-25%) scaleY(0.6); }
+}
+
+/* ── Checkbox ─────────────────────────────────────── */
+input[type="checkbox"] { accent-color: var(--color-teal-500); }
+
+/* ── Focus ring ───────────────────────────────────── */
+*:focus-visible { outline: 2px solid var(--color-teal-500); outline-offset: 2px; }
+
+/* ── Recharts tooltip ─────────────────────────────── */
+.recharts-default-tooltip {
+  background: var(--c-panel) !important;
+  border: 1px solid var(--c-edge) !important;
+  border-radius: 12px !important;
+  color: var(--c-ink) !important;
+}
+
+/* ── Print (coupon) ───────────────────────────────── */
+@media print {
+  body { background: white !important; color: black !important; }
+  body * { visibility: hidden !important; }
+  #coupon-print, #coupon-print * { visibility: visible !important; }
+  #coupon-print {
+    position: fixed !important; left: 0 !important; top: 0 !important;
+    width: 100% !important; max-width: 80mm; margin: 0 auto;
+    padding: 16px !important; background: white !important;
+    color: black !important; border-radius: 0 !important; box-shadow: none !important;
+  }
+}
