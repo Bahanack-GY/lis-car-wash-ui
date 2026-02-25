@@ -45,5 +45,12 @@ export const clientsApi = {
     createSubscription: async ({ id, data }: { id: number; data: CreateSubscriptionDto }): Promise<Subscription> => {
         const response = await apiClient.post<Subscription>(`/clients/${id}/subscriptions`, data);
         return response.data;
-    }
+    },
+
+    searchVehicleByPlate: async (immatriculation: string): Promise<Vehicle | null> => {
+        const response = await apiClient.get<Vehicle | null>('/clients/vehicles/search', {
+            params: { immatriculation },
+        });
+        return response.data;
+    },
 };

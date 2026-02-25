@@ -169,11 +169,14 @@ export default function NouveauLavage() {
   const [damages, setDamages] = useState<string[]>([])
   const toggleDamage = (d: string) => setDamages((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]))
 
-  // ── Step 3 — Washers ─────────────────────────────
-  // Multiple washers might need a specific relation, but for FichePiste it takes 1 controller if any according to DTO. 
-  // We will map "pickedWashers" to "controleurId" for now as single for simplicity, or just as UI mock for now until DB supports multiple laveurs
-  const [pickedWasherId, setPickedWasherId] = useState<number | null>(null)
+  // ── Step 3 — Washers (multi-select) ─────────────
+  const [pickedWasherIds, setPickedWasherIds] = useState<number[]>([])
   const [busyWasherConfirm, setBusyWasherConfirm] = useState<number | null>(null) // washer ID pending confirmation
+
+  const toggleWasher = (id: number) =>
+    setPickedWasherIds((prev) =>
+      prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id],
+    )
 
   // ── Derived data ─────────────────────────────────
   const wash = washTypes.find((w) => w.id === washId) ?? null
@@ -209,15 +212,15 @@ export default function NouveauLavage() {
         return clientOk && vehicleOk
       }
       case 2: return true
-      case 3: return pickedWasherId !== null
+      case 3: return pickedWasherIds.length > 0
       default: return false
     }
-  }, [step, washId, isNewClient, newName, newPhone, selectedClientId, pickedWasherId, vPlate, isNewVehicle, selectedVehicleId])
+  }, [step, washId, isNewClient, newName, newPhone, selectedClientId, pickedWasherIds, vPlate, isNewVehicle, selectedVehicleId])
 
   // ── Derived: selected existing vehicle record ───
   const selectedVehicleRecord = (clientVehicles || []).find((v: Vehicle) => v.id === selectedVehicleId)
 
-  // Vehicle display — use selected existing vehicle or the new vehicle form fields
+  // Vehicle display
   const vehicleBrandDisplay = isNewVehicle ? (vBrand || 'Inconnu') : (selectedVehicleRecord?.brand || 'Inconnu')
   const vehicleModelDisplay = isNewVehicle ? vModel : (selectedVehicleRecord?.modele || '')
   const vehiclePlateDisplay = isNewVehicle ? vPlate : (selectedVehicleRecord?.immatriculation || '')
@@ -226,7 +229,8 @@ export default function NouveauLavage() {
   // ── Confirm ──────────────────────────────────────
   const handleConfirm = async () => {
     try {
-      let finalClientId = selectedClientId
+      let finalClientId: number | null = selectedClientId
+      let finalVehicleId: number | null = selectedVehicleId
 
       if (isNewClient && newName && newPhone) {
         const newC = await createClient.mutateAsync({
@@ -239,7 +243,6 @@ export default function NouveauLavage() {
       }
 
       // Use existing vehicle or create a new one
-      let finalVehicleId = selectedVehicleId
       if (isNewVehicle) {
         const vehicle = await createVehicle.mutateAsync({
           id: Number(finalClientId),
@@ -262,9 +265,9 @@ export default function NouveauLavage() {
         clientId: Number(finalClientId),
         vehicleId: Number(finalVehicleId),
         typeLavageId: Number(washId),
-        controleurId: pickedWasherId ? Number(pickedWasherId) : undefined,
+        controleurId: undefined,
         extrasIds: selectedExtrasIds,
-        washerIds: pickedWasherId ? [Number(pickedWasherId)] : [],
+        washerIds: pickedWasherIds,
         date: new Date().toISOString().split('T')[0],
         etatLieu: etatLieuStr,
       })
@@ -273,7 +276,7 @@ export default function NouveauLavage() {
       setCreatedCoupon(result)
     } catch (err) {
       console.error("Failed to submit Fiche de piste flow", err)
-      alert("Erreur lors de la création")
+      // error displayed by axios interceptor
     }
   }
 
@@ -418,84 +421,85 @@ export default function NouveauLavage() {
 
                 {step === 1 && (
                   <div className="space-y-5">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-heading font-semibold text-ink text-lg">Client</h3>
-                      <div className="flex bg-inset rounded-lg p-0.5">
-                        <button
-                          onClick={() => setIsNewClient(false)}
-                          className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                            !isNewClient ? 'bg-accent-wash text-accent' : 'text-ink-faded'
-                          }`}
-                        >
-                          Existant
-                        </button>
-                        <button
-                          onClick={() => { setIsNewClient(true); setSelectedClientId(null); }}
-                          className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                            isNewClient ? 'bg-accent-wash text-accent' : 'text-ink-faded'
-                          }`}
-                        >
-                          Nouveau
-                        </button>
+                    <div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <h3 className="font-heading font-semibold text-ink text-lg">Client</h3>
+                        <div className="flex bg-inset rounded-lg p-0.5">
+                          <button
+                            onClick={() => setIsNewClient(false)}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                              !isNewClient ? 'bg-accent-wash text-accent' : 'text-ink-faded'
+                            }`}
+                          >
+                            Existant
+                          </button>
+                          <button
+                            onClick={() => { setIsNewClient(true); setSelectedClientId(null); }}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                              isNewClient ? 'bg-accent-wash text-accent' : 'text-ink-faded'
+                            }`}
+                          >
+                            Nouveau
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {!isNewClient ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 bg-inset border border-outline rounded-xl px-4 py-2.5 focus-within:border-teal-500/40 transition-colors">
-                          <Search className="w-4 h-4 text-ink-muted" />
-                          <input
-                            value={clientSearch}
-                            onChange={(e) => setClientSearch(e.target.value)}
-                            placeholder="Rechercher par nom ou téléphone..."
-                            className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
-                          />
+                      {!isNewClient ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 bg-inset border border-outline rounded-xl px-4 py-2.5 focus-within:border-teal-500/40 transition-colors">
+                            <Search className="w-4 h-4 text-ink-muted" />
+                            <input
+                              value={clientSearch}
+                              onChange={(e) => setClientSearch(e.target.value)}
+                              placeholder="Rechercher par nom ou téléphone..."
+                              className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
+                            />
+                          </div>
+                          <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                            {filteredClients.map((c) => {
+                              const sel = selectedClientId === c.id
+                              return (
+                                <button
+                                  key={c.id}
+                                  onClick={() => setSelectedClientId(c.id)}
+                                  className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
+                                    sel ? 'bg-accent-wash border border-accent-line' : 'bg-inset border border-divider hover:border-outline'
+                                  }`}
+                                >
+                                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500/80 to-navy-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                                    {c.nom.split(' ').map((n) => n[0]).join('')}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-ink">{c.nom}</p>
+                                    <p className="text-xs text-ink-muted">{c.contact}</p>
+                                  </div>
+                                  {sel && <Check className="w-4 h-4 text-accent" />}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                          {filteredClients.map((c) => {
-                            const sel = selectedClientId === c.id
-                            return (
-                              <button
-                                key={c.id}
-                                onClick={() => setSelectedClientId(c.id)}
-                                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-                                  sel ? 'bg-accent-wash border border-accent-line' : 'bg-inset border border-divider hover:border-outline'
-                                }`}
-                              >
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500/80 to-navy-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                                  {c.nom.split(' ').map((n) => n[0]).join('')}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-ink">{c.nom}</p>
-                                  <p className="text-xs text-ink-muted">{c.contact}</p>
-                                </div>
-                                {sel && <Check className="w-4 h-4 text-accent" />}
-                              </button>
-                            )
-                          })}
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-ink-light mb-1.5">Nom complet *</label>
+                            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nom et prénom" className={inputCls} />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-ink-light mb-1.5">Téléphone *</label>
+                            <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+221 7X XXX XXXX" className={inputCls} />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-medium text-ink-light mb-1.5">Email</label>
+                            <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@exemple.com" className={inputCls} />
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-ink-light mb-1.5">Nom complet *</label>
-                          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nom et prénom" className={inputCls} />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-ink-light mb-1.5">Téléphone *</label>
-                          <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+221 7X XXX XXXX" className={inputCls} />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-medium text-ink-light mb-1.5">Email</label>
-                          <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@exemple.com" className={inputCls} />
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     <div className="pt-4 border-t border-divider">
                       <div className="flex items-center gap-3 mb-3">
                         <h4 className="font-heading font-medium text-ink text-sm">Véhicule</h4>
-                        {/* Toggle only when client has existing vehicles */}
                         {!isNewClient && selectedClientId && (clientVehicles || []).length > 0 && (
                           <div className="flex bg-inset rounded-lg p-0.5">
                             <button
@@ -551,7 +555,6 @@ export default function NouveauLavage() {
                           ) : (
                             <p className="text-sm text-ink-muted py-4 text-center">Aucun véhicule enregistré</p>
                           )}
-                          {/* Quick add button */}
                           <button
                             onClick={() => { setIsNewVehicle(true); setSelectedVehicleId(null) }}
                             className="flex items-center gap-2 text-sm text-accent hover:text-accent-bold transition-colors mt-2"
@@ -638,14 +641,20 @@ export default function NouveauLavage() {
 
                 {step === 3 && (
                   <div className="space-y-5">
-                    <h3 className="font-heading font-semibold text-ink text-lg">Affecter un laveur</h3>
+                    <h3 className="font-heading font-semibold text-ink text-lg">Affecter les laveurs</h3>
                     <p className="text-sm text-ink-faded">
-                      Sélectionnez un employé responsable.
+                      Sélectionnez un ou plusieurs laveurs pour ce véhicule.
                     </p>
+
+                    {pickedWasherIds.length > 0 && (
+                      <p className="text-xs font-medium text-accent">
+                        {pickedWasherIds.length} laveur{pickedWasherIds.length > 1 ? 's' : ''} sélectionné{pickedWasherIds.length > 1 ? 's' : ''}
+                      </p>
+                    )}
 
                     <div className="space-y-2 pr-2">
                       {washersList.map((w) => {
-                        const sel = pickedWasherId === w.id
+                        const sel = pickedWasherIds.includes(w.id)
                         const isBusy = busyWasherIds.has(w.id)
                         return (
                           <button
@@ -654,7 +663,7 @@ export default function NouveauLavage() {
                               if (isBusy && !sel) {
                                 setBusyWasherConfirm(w.id)
                               } else {
-                                setPickedWasherId(w.id)
+                                toggleWasher(w.id)
                               }
                             }}
                             className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
@@ -665,7 +674,7 @@ export default function NouveauLavage() {
                                   : 'border-edge bg-inset hover:border-outline'
                             }`}
                           >
-                            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-sm flex-shrink-0 ${
+                            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-sm shrink-0 ${
                               sel ? 'bg-teal-500 text-white' : 'bg-gradient-to-br from-teal-500/60 to-navy-500 text-white'
                             }`}>
                               {sel ? <Check className="w-5 h-5" /> : w.nom[0] + (w.nom.split(' ')[1]?.[0] || '')}
@@ -676,12 +685,12 @@ export default function NouveauLavage() {
                                 {isBusy ? 'Lavage en cours' : 'Laveur'}
                               </p>
                             </div>
-                            <div className="flex-shrink-0">
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
-                                sel ? 'bg-teal-500/20 text-accent-bold' : isBusy ? 'bg-warn-wash text-warn' : 'bg-emerald-500/10 text-ok'
+                            <div className="shrink-0">
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                sel ? 'bg-teal-500 border-teal-500' : 'border-outline'
                               }`}>
-                                {sel ? 'Assigné' : isBusy ? 'Occupé' : 'Sélectionner'}
-                              </span>
+                                {sel && <Check className="w-3 h-3 text-white" />}
+                              </div>
                             </div>
                           </button>
                         )
@@ -757,7 +766,7 @@ export default function NouveauLavage() {
                       <div className="mb-4">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Laveurs assignés</p>
                         <div className="space-y-1">
-                          {washersList.filter((w) => pickedWasherId === w.id).map((w) => (
+                          {washersList.filter((w) => pickedWasherIds.includes(w.id)).map((w) => (
                             <p key={w.id} className="text-sm text-gray-700">• {w.nom}</p>
                           ))}
                         </div>
@@ -812,7 +821,7 @@ export default function NouveauLavage() {
                     onClick={() => {
                       const logoImg = document.querySelector('#coupon-print img') as HTMLImageElement | null
                       const logoSrc = logoImg?.src || ''
-                      const washerName = washersList.find(w => w.id === pickedWasherId)?.nom || ''
+                      const selectedWasherNames = washersList.filter(w => pickedWasherIds.includes(w.id)).map(w => w.nom)
                       const extrasHtml = selectedExtras.map(e =>
                         `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px;padding-left:12px;color:#4b5563">
                           <span>+ ${e.nom}</span><span style="color:#6b7280">${e.prix?.toLocaleString()} F</span>
@@ -896,7 +905,7 @@ export default function NouveauLavage() {
   </div>
   <div class="section washers">
     <p class="section-label">Laveurs assignés</p>
-    <p class="washer">• ${washerName}</p>
+    ${selectedWasherNames.map(n => `<p class="washer">• ${n}</p>`).join('')}
   </div>
   ${etatHtml}
   <div class="footer">
@@ -983,13 +992,13 @@ export default function NouveauLavage() {
             </div>
 
             <div className="mb-5">
-              <p className="text-[10px] font-bold text-ink-faded uppercase tracking-widest mb-1.5">Laveurs (Contrôleur)</p>
-              {pickedWasherId ? (
+              <p className="text-[10px] font-bold text-ink-faded uppercase tracking-widest mb-1.5">Laveurs</p>
+              {pickedWasherIds.length > 0 ? (
                 <div className="space-y-1">
-                  {washersList.filter((w) => pickedWasherId === w.id).map((w) => (
+                  {washersList.filter((w) => pickedWasherIds.includes(w.id)).map((w) => (
                     <div key={w.id} className="flex items-center gap-2 bg-inset rounded-xl px-3 py-2">
                       <div className="w-6 h-6 rounded-full bg-accent-wash flex items-center justify-center text-[10px] font-bold text-accent-bold">
-                        U
+                        {w.nom[0]}
                       </div>
                       <span className="text-sm text-ink">{w.nom}</span>
                     </div>
@@ -1048,7 +1057,7 @@ export default function NouveauLavage() {
                 </button>
                 <button
                   onClick={() => {
-                    setPickedWasherId(busyWasherConfirm)
+                    toggleWasher(busyWasherConfirm!)
                     setBusyWasherConfirm(null)
                   }}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 text-white text-sm font-semibold shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30 transition-all"

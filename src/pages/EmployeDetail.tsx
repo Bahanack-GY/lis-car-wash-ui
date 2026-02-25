@@ -6,7 +6,7 @@ import {
   ArrowLeft, Phone, Mail, Shield, MapPin, Calendar, Loader2,
   Pencil, Save, X, ArrowRightLeft, UserCog, Clock, CheckCircle2, XCircle,
   Car, Award, CalendarDays, TrendingUp, AlertTriangle, Ban, UserX, RotateCcw, ShieldAlert,
-  Banknote, ClipboardList, CreditCard, Hash, ArrowUpCircle,
+  Banknote, ClipboardList, CreditCard, Hash, ArrowUpCircle, Megaphone, Target,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -17,6 +17,7 @@ import { useUser, useUpdateUser, useTransferStation, useUserPerformance, useAddS
 import { useStations } from '@/api/stations'
 import { useCaisseTransactions } from '@/api/caisse'
 import { useFichesPiste } from '@/api/fiches-piste'
+import { useCommercialStatsByUser } from '@/api/commercial/queries'
 import type { Affectation, Sanction, SanctionType, Promotion } from '@/api/users/types'
 import type { Paiement } from '@/api/paiements/types'
 import type { FichePiste } from '@/api/fiches-piste/types'
@@ -40,6 +41,7 @@ const roleCfg: Record<string, { label: string; cls: string }> = {
   controleur: { label: 'Contrôleur', cls: 'bg-info-wash text-info border-info-line' },
   caissiere: { label: 'Caissière', cls: 'bg-warn-wash text-warn border-warn-line' },
   laveur: { label: 'Laveur', cls: 'bg-accent-wash text-accent-bold border-accent-line' },
+  commercial: { label: 'Commercial', cls: 'bg-blue-500/10 text-blue-600 border-blue-200' },
 }
 
 interface PerfRecord {
@@ -135,6 +137,9 @@ export default function EmployeDetail() {
     endDate: dateRange.endDate,
     limit: 500,
   })
+
+  // Commercial: fetch their stats
+  const { data: commercialStats } = useCommercialStatsByUser(userId)
 
   // Contrôleur: fetch their fiches
   const { data: fichesData, isFetching: fichesFetching } = useFichesPiste({
@@ -309,7 +314,7 @@ export default function EmployeDetail() {
       toast.success('Employé mis à jour avec succès')
       setIsEditing(false)
     } catch {
-      toast.error('Erreur lors de la mise à jour')
+      // error displayed by axios interceptor
     }
   }
 
@@ -721,6 +726,60 @@ export default function EmployeDetail() {
             </div>
           )}
         </motion.div>
+      )}
+
+      {/* ── Commercial: Registration stats ────────────────── */}
+      {user.role === 'commercial' && commercialStats && (
+        <>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            {[
+              { label: "Enregistrés aujourd'hui", value: commercialStats.todayTotal, icon: Car, accent: 'bg-blue-500/10 text-blue-500' },
+              { label: "Confirmés aujourd'hui", value: commercialStats.todayConfirmed, icon: CheckCircle2, accent: 'bg-emerald-500/10 text-emerald-500' },
+              { label: 'Total enregistrés', value: commercialStats.allTimeTotal, icon: TrendingUp, accent: 'bg-teal-500/10 text-teal-500' },
+              { label: 'Total confirmés', value: commercialStats.allTimeConfirmed, icon: Target, accent: 'bg-purple-500/10 text-purple-500' },
+            ].map((s) => {
+              const Icon = s.icon
+              return (
+                <motion.div key={s.label} variants={rise} className="bg-panel border border-edge rounded-2xl p-4 shadow-sm">
+                  <div className={`p-2.5 rounded-xl w-fit ${s.accent} mb-3`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <p className="font-heading text-xl font-bold text-ink">{s.value}</p>
+                  <p className="text-xs text-ink-faded mt-0.5">{s.label}</p>
+                </motion.div>
+              )
+            })}
+          </div>
+
+          <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-heading font-semibold text-ink flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-blue-500" /> Objectif du jour
+              </h3>
+              <span className="text-sm font-medium text-ink-muted">
+                {commercialStats.todayConfirmed} / {commercialStats.dailyGoal}
+              </span>
+            </div>
+            <div className="relative h-4 bg-inset rounded-full overflow-hidden border border-edge">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min((commercialStats.todayConfirmed / commercialStats.dailyGoal) * 100, 100)}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                className={`absolute inset-y-0 left-0 rounded-full ${
+                  commercialStats.todayConfirmed >= commercialStats.dailyGoal
+                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                    : 'bg-gradient-to-r from-blue-600 to-blue-400'
+                }`}
+              />
+            </div>
+            {commercialStats.todayConfirmed >= commercialStats.dailyGoal && (
+              <p className="text-xs text-emerald-500 font-medium mt-2 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Objectif atteint !
+              </p>
+            )}
+          </motion.div>
+        </>
       )}
 
       {/* ── Edit section ────────────────────────────────── */}

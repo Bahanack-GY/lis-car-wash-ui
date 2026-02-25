@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import { authApi } from '@/api/auth/api'
 import type { UserProfile } from '@/api/auth/types'
 
-export type UserRole = 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur'
+export type UserRole = 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial'
 
 interface AuthContextValue {
   user: UserProfile | null
@@ -108,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       case 'laveur':    return '/mon-espace'
       case 'caissiere': return '/coupons'
       case 'controleur':return '/fiches-piste'
+      case 'commercial':return '/espace-commercial'
       default:          return '/dashboard'
     }
   })()

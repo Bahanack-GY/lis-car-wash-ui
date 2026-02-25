@@ -15,6 +15,7 @@ export const CLIENTS_KEYS = {
     details: () => [...CLIENTS_KEYS.all, 'detail'] as const,
     detail: (id: number) => [...CLIENTS_KEYS.details(), id] as const,
     vehicles: (id: number) => [...CLIENTS_KEYS.detail(id), 'vehicles'] as const,
+    vehicleByPlate: (plate: string) => [...CLIENTS_KEYS.all, 'vehicleByPlate', plate] as const,
 };
 
 export const useClients = (filters?: ClientFilters) => {
@@ -72,6 +73,15 @@ export const useCreateVehicle = () => {
             queryClient.invalidateQueries({ queryKey: CLIENTS_KEYS.vehicles(variables.id) });
             queryClient.invalidateQueries({ queryKey: CLIENTS_KEYS.detail(variables.id) });
         },
+    });
+};
+
+export const useSearchVehicleByPlate = (immatriculation: string) => {
+    const plate = immatriculation.trim().toUpperCase();
+    return useQuery({
+        queryKey: CLIENTS_KEYS.vehicleByPlate(plate),
+        queryFn: () => clientsApi.searchVehicleByPlate(plate),
+        enabled: plate.length >= 3,
     });
 };
 

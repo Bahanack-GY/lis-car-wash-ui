@@ -35,9 +35,10 @@ export default function Login() {
         }
         // Navigate to role-appropriate default page
         const path =
-          profile.role === 'laveur'     ? '/mon-espace'    :
-          profile.role === 'caissiere'  ? '/coupons'       :
-          profile.role === 'controleur' ? '/fiches-piste'  :
+          profile.role === 'laveur'      ? '/mon-espace'        :
+          profile.role === 'caissiere'   ? '/coupons'           :
+          profile.role === 'controleur'  ? '/fiches-piste'      :
+          profile.role === 'commercial'  ? '/espace-commercial' :
           '/dashboard'
         navigate(path)
       }

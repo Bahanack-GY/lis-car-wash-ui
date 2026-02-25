@@ -22,6 +22,8 @@ import NouveauLavage from '@/pages/NouveauLavage'
 import SelectStation from '@/pages/SelectStation'
 import GlobalDashboard from '@/pages/GlobalDashboard'
 import MonEspace from '@/pages/MonEspace'
+import Commercial from '@/pages/Commercial'
+import CommercialAnalytics from '@/pages/CommercialAnalytics'
 import Unauthorized from '@/pages/Unauthorized'
 
 export default function App() {
@@ -137,6 +139,18 @@ export default function App() {
           <Route path="/mon-espace" element={
             <ProtectedRoute roles={['laveur']}>
               <MonEspace />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/espace-commercial" element={
+            <ProtectedRoute roles={['commercial']}>
+              <Commercial />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/commercial-analytics" element={
+            <ProtectedRoute roles={['commercial']}>
+              <CommercialAnalytics />
             </ProtectedRoute>
           } />
         </Route>

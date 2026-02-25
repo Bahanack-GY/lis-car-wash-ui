@@ -5,6 +5,7 @@ import {
   LayoutDashboard, CalendarDays, ClipboardList, Ticket, CreditCard,
   Users, Package, UserCog, Building2, Search, Bell, LogOut,
   ChevronLeft, Menu, Plus, Sun, Moon, Star, Droplets, Sparkles, MapPin, Check, ChevronsUpDown, Clock, AlertTriangle,
+  Megaphone, BarChart3,
 } from 'lucide-react'
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -34,6 +35,8 @@ const allNavItems: NavItem[] = [
   { path: '/employes',      label: 'Employés',          icon: UserCog,         roles: ['super_admin', 'manager'] },
   { path: '/stations',      label: 'Stations',          icon: Building2,       roles: ['super_admin'] },
   { path: '/mon-espace',    label: 'Mon Espace',        icon: Star,            roles: ['laveur'] },
+  { path: '/espace-commercial', label: 'Espace Commercial', icon: Megaphone,     roles: ['commercial'] },
+  { path: '/commercial-analytics', label: 'Mes Statistiques', icon: BarChart3,   roles: ['commercial'] },
 ]
 
 const roleLabel: Record<UserRole, string> = {
@@ -42,6 +45,7 @@ const roleLabel: Record<UserRole, string> = {
   controleur: 'Contrôleur',
   caissiere: 'Caissière',
   laveur: 'Laveur',
+  commercial: 'Commercial',
 }
 
 export default function Layout() {

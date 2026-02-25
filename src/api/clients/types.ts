@@ -38,6 +38,7 @@ export interface Vehicle {
     type?: string;
     brand?: string;
     clientId: number;
+    client?: Client;
     createdAt: string;
     updatedAt: string;
 }

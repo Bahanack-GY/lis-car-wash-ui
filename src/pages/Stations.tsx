@@ -229,7 +229,7 @@ export default function Stations() {
     try {
       await createStation.mutateAsync(createForm)
       setIsCreateModalOpen(false)
-      setCreateForm({ nom: '', adresse: '', town: '', contact: '', status: 'active' })
+      setCreateForm({ nom: '', adresse: '', town: '', contact: '', status: 'active', objectifCommercialJournalier: 10 })
       toast.success('Station créée avec succès')
     } catch {
       toast.error('Erreur lors de la création de la station')
@@ -256,6 +256,7 @@ export default function Stations() {
       town: station.town,
       contact: station.contact || '',
       status: station.status,
+      objectifCommercialJournalier: station.objectifCommercialJournalier ?? 10,
     })
   }
 
@@ -289,7 +290,7 @@ export default function Stations() {
       closeManagerModal()
       toast.success(`${newManager.prenom} ${newManager.nom} créé et assigné comme manager`)
     } catch {
-      toast.error('Erreur lors de la création du manager')
+      // error displayed by axios interceptor
     }
   }
 
@@ -490,6 +491,19 @@ export default function Stations() {
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-ink-light mb-1.5">Objectif commercial journalier</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={createForm.objectifCommercialJournalier ?? 10}
+                    onChange={(e) => setCreateForm({ ...createForm, objectifCommercialJournalier: Number(e.target.value) || 10 })}
+                    className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                    placeholder="10"
+                  />
+                  <p className="text-xs text-ink-muted mt-1">Nombre de véhicules à enregistrer par jour par commercial</p>
+                </div>
+
                 <div className="pt-4 flex justify-end gap-3 border-t border-divider mt-6">
                   <button
                     type="button"
@@ -601,6 +615,19 @@ export default function Stations() {
                     <option value="upcoming">Bientôt</option>
                     <option value="inactive">Inactive</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink-light mb-1.5">Objectif commercial journalier</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editForm.objectifCommercialJournalier ?? 10}
+                    onChange={(e) => setEditForm({ ...editForm, objectifCommercialJournalier: Number(e.target.value) || 10 })}
+                    className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                    placeholder="10"
+                  />
+                  <p className="text-xs text-ink-muted mt-1">Nombre de véhicules à enregistrer par jour par commercial</p>
                 </div>
 
                 <div className="pt-4 flex justify-end gap-3 border-t border-divider mt-6">

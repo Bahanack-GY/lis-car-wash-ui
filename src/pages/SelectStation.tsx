@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Building2, MapPin, Users, ArrowRight, LogOut, Sun, Moon, Clock, Search, AlertTriangle, UserCog, BarChart3,
+  Building2, MapPin, Users, ArrowRight, LogOut, Sun, Moon, Clock, Search,
+  AlertTriangle, UserCog, BarChart3, Plus, X, Shield, ChevronRight,
 } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
-import { useStations } from '@/api/stations'
+import { useStations, useCreateStation } from '@/api/stations'
 import { useActiveIncidentsByStation } from '@/api/incidents'
+import { useCreateUser, useAssignStation } from '@/api/users'
 
 type StatusFilter = 'all' | 'active' | 'inactive' | 'upcoming'
 type IncidentFilter = 'all' | 'no_incident' | 'incident' | 'stopped'
@@ -37,9 +41,28 @@ export default function SelectStation() {
   const [incidentFilter, setIncidentFilter] = useState<IncidentFilter>('all')
   const [townFilter, setTownFilter] = useState<string>('all')
 
+  // Create station + manager modal state
+  const [showModal, setShowModal] = useState(false)
+  const [modalStep, setModalStep] = useState<1 | 2>(1)
+  const [createdStationId, setCreatedStationId] = useState<number | null>(null)
+  const [createdStationName, setCreatedStationName] = useState('')
+
+  // Station form
+  const [stationForm, setStationForm] = useState({
+    nom: '', adresse: '', town: '', contact: '', status: 'active' as const,
+  })
+
+  // Manager form
+  const [managerForm, setManagerForm] = useState({
+    nom: '', prenom: '', email: '', telephone: '', password: '',
+  })
+
+  const createStation = useCreateStation()
+  const createUser = useCreateUser()
+  const assignStation = useAssignStation()
+
   const stationsList = stationsData || []
 
-  // Extract unique towns for the dropdown
   const towns = useMemo(() => {
     const set = new Set(stationsList.map(s => s.town))
     return Array.from(set).sort()
@@ -48,17 +71,14 @@ export default function SelectStation() {
   const filtered = useMemo(() => {
     let list = stationsList
 
-    // Status filter
     if (statusFilter !== 'all') {
       list = list.filter((s) => s.status === statusFilter)
     }
 
-    // Town filter
     if (townFilter !== 'all') {
       list = list.filter((s) => s.town === townFilter)
     }
 
-    // Incident filter
     if (incidentFilter !== 'all' && incidentStatusMap) {
       list = list.filter((s) => {
         const iStatus = incidentStatusMap[s.id]
@@ -69,7 +89,6 @@ export default function SelectStation() {
       })
     }
 
-    // Search filter
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -84,7 +103,6 @@ export default function SelectStation() {
     return list
   }, [stationsList, search, statusFilter, townFilter, incidentFilter, incidentStatusMap])
 
-  // Counts per status for filter badges
   const statusCounts = useMemo(() => ({
     all: stationsList.length,
     active: stationsList.filter(s => s.status === 'active').length,
@@ -92,7 +110,6 @@ export default function SelectStation() {
     upcoming: stationsList.filter(s => s.status === 'upcoming').length,
   }), [stationsList])
 
-  // Non-super_admin should never reach this page — redirect immediately
   useEffect(() => {
     if (user && user.role !== 'super_admin') {
       navigate(defaultPath, { replace: true })
@@ -109,6 +126,54 @@ export default function SelectStation() {
   const handleLogout = () => {
     logout()
     navigate('/')
+  }
+
+  const openModal = () => {
+    setShowModal(true)
+    setModalStep(1)
+    setCreatedStationId(null)
+    setCreatedStationName('')
+    setStationForm({ nom: '', adresse: '', town: '', contact: '', status: 'active' })
+    setManagerForm({ nom: '', prenom: '', email: '', telephone: '', password: '' })
+  }
+
+  const closeModal = () => {
+    setShowModal(false)
+  }
+
+  const handleCreateStation = async () => {
+    if (!stationForm.nom.trim() || !stationForm.adresse.trim() || !stationForm.town.trim()) {
+      toast.error('Veuillez remplir tous les champs obligatoires')
+      return
+    }
+    try {
+      const station = await createStation.mutateAsync(stationForm)
+      setCreatedStationId(station.id)
+      setCreatedStationName(station.nom)
+      setModalStep(2)
+      toast.success(`Station "${station.nom}" créée avec succès`)
+    } catch {
+      // error displayed by axios interceptor
+    }
+  }
+
+  const handleCreateManager = async () => {
+    if (!managerForm.nom.trim() || !managerForm.prenom.trim() || !managerForm.email.trim() || !managerForm.password.trim()) {
+      toast.error('Veuillez remplir tous les champs obligatoires')
+      return
+    }
+    try {
+      const newUser = await createUser.mutateAsync({ ...managerForm, role: 'manager' as const })
+      const today = new Date().toISOString().split('T')[0]
+      await assignStation.mutateAsync({
+        id: newUser.id,
+        data: { stationId: createdStationId!, dateDebut: today },
+      })
+      toast.success(`Manager ${newUser.prenom} ${newUser.nom} créé et affecté à "${createdStationName}"`)
+      closeModal()
+    } catch {
+      // error displayed by axios interceptor
+    }
   }
 
   const roleLabel: Record<string, string> = {
@@ -172,18 +237,26 @@ export default function SelectStation() {
             <p className="text-ink-faded mt-3 max-w-md mx-auto">
               Sélectionnez la station sur laquelle vous travaillez aujourd'hui.
             </p>
-            <button
-              onClick={() => navigate('/global-dashboard')}
-              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-panel border border-edge rounded-xl text-sm font-medium text-ink hover:border-teal-500 hover:shadow-md transition-all duration-200"
-            >
-              <BarChart3 className="w-4 h-4 text-accent" />
-              Tableau de bord global
-            </button>
+            <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
+              <button
+                onClick={() => navigate('/global-dashboard')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-panel border border-edge rounded-xl text-sm font-medium text-ink hover:border-teal-500 hover:shadow-md transition-all duration-200"
+              >
+                <BarChart3 className="w-4 h-4 text-accent" />
+                Tableau de bord global
+              </button>
+              <button
+                onClick={openModal}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 hover:shadow-md transition-all duration-200"
+              >
+                <Plus className="w-4 h-4" />
+                Nouvelle station
+              </button>
+            </div>
           </div>
 
           {/* Search + Filters */}
           <div className="max-w-2xl mx-auto mb-6 space-y-3">
-            {/* Search bar */}
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" />
               <input
@@ -195,9 +268,7 @@ export default function SelectStation() {
               />
             </div>
 
-            {/* Filters row */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {/* Status filter tabs */}
               <div className="flex bg-panel border border-edge rounded-xl p-1 shadow-sm">
                 {statusTabs.map((tab) => {
                   const count = statusCounts[tab.key]
@@ -226,7 +297,6 @@ export default function SelectStation() {
                 })}
               </div>
 
-              {/* Town filter */}
               {towns.length > 1 && (
                 <select
                   value={townFilter}
@@ -240,7 +310,6 @@ export default function SelectStation() {
                 </select>
               )}
 
-              {/* Incident filter */}
               <div className="flex bg-panel border border-edge rounded-xl p-1 shadow-sm">
                 {incidentTabs.map((tab) => (
                   <button
@@ -272,10 +341,23 @@ export default function SelectStation() {
               Erreur lors du chargement des stations.
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center text-ink-muted p-8 border border-dashed border-divider rounded-xl">
+            <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
               {search || statusFilter !== 'all'
                 ? 'Aucune station ne correspond à vos critères.'
-                : 'Aucune station disponible.'}
+                : (
+                  <div className="space-y-4">
+                    <Building2 className="w-12 h-12 text-ink-muted/40 mx-auto" />
+                    <p className="text-lg font-medium text-ink-faded">Aucune station disponible</p>
+                    <p className="text-sm">Commencez par créer votre première station.</p>
+                    <button
+                      onClick={openModal}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Créer votre première station
+                    </button>
+                  </div>
+                )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -340,7 +422,6 @@ export default function SelectStation() {
                       {s.adresse}, {s.town}
                     </p>
 
-                    {/* Manager + employees */}
                     <div className="flex items-center gap-4 pt-4 border-t border-divider mt-auto w-full">
                       <div className="flex items-center gap-1.5 text-sm text-ink-faded">
                         <Users className="w-3.5 h-3.5 text-ink-muted" />
@@ -372,6 +453,232 @@ export default function SelectStation() {
           </p>
         </div>
       </div>
+
+      {/* Create Station + Manager Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={(e) => e.target === e.currentTarget && closeModal()}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-panel border border-edge rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
+            >
+              {/* Modal header with step indicator */}
+              <div className="px-6 pt-6 pb-4 border-b border-divider">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-heading font-bold text-lg text-ink">
+                    {modalStep === 1 ? 'Nouvelle station' : 'Créer le manager'}
+                  </h3>
+                  <button onClick={closeModal} className="text-ink-muted hover:text-ink p-1 rounded-lg hover:bg-raised transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                {/* Steps */}
+                <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${
+                    modalStep === 1 ? 'bg-accent-wash text-accent' : 'bg-emerald-500/10 text-emerald-600'
+                  }`}>
+                    {modalStep > 1 ? '✓' : '1.'}
+                    <span>Station</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-ink-muted" />
+                  <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${
+                    modalStep === 2 ? 'bg-accent-wash text-accent' : 'bg-raised text-ink-muted'
+                  }`}>
+                    2. <span>Manager</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+                {modalStep === 1 ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-ink mb-1.5">Nom de la station *</label>
+                      <input
+                        type="text"
+                        value={stationForm.nom}
+                        onChange={(e) => setStationForm(f => ({ ...f, nom: e.target.value }))}
+                        placeholder="Ex: LIS Douala Akwa"
+                        className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink mb-1.5">Adresse *</label>
+                      <input
+                        type="text"
+                        value={stationForm.adresse}
+                        onChange={(e) => setStationForm(f => ({ ...f, adresse: e.target.value }))}
+                        placeholder="Ex: Rue de la Joie, Akwa"
+                        className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-ink mb-1.5">Ville *</label>
+                        <input
+                          type="text"
+                          value={stationForm.town}
+                          onChange={(e) => setStationForm(f => ({ ...f, town: e.target.value }))}
+                          placeholder="Ex: Douala"
+                          className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-ink mb-1.5">Contact</label>
+                        <input
+                          type="text"
+                          value={stationForm.contact}
+                          onChange={(e) => setStationForm(f => ({ ...f, contact: e.target.value }))}
+                          placeholder="Ex: 6 99 00 00 00"
+                          className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink mb-1.5">Statut</label>
+                      <select
+                        value={stationForm.status}
+                        onChange={(e) => setStationForm(f => ({ ...f, status: e.target.value as any }))}
+                        className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 cursor-pointer"
+                      >
+                        <option value="active">Active</option>
+                        <option value="upcoming">À venir</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Success banner */}
+                    <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Station créée</p>
+                        <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70">{createdStationName}</p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-ink-faded flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-accent" />
+                      Créez un manager pour gérer cette station
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-ink mb-1.5">Nom *</label>
+                        <input
+                          type="text"
+                          value={managerForm.nom}
+                          onChange={(e) => setManagerForm(f => ({ ...f, nom: e.target.value }))}
+                          placeholder="Nom de famille"
+                          className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-ink mb-1.5">Prénom *</label>
+                        <input
+                          type="text"
+                          value={managerForm.prenom}
+                          onChange={(e) => setManagerForm(f => ({ ...f, prenom: e.target.value }))}
+                          placeholder="Prénom"
+                          className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink mb-1.5">Email *</label>
+                      <input
+                        type="email"
+                        value={managerForm.email}
+                        onChange={(e) => setManagerForm(f => ({ ...f, email: e.target.value }))}
+                        placeholder="manager@lis-carwash.cm"
+                        className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink mb-1.5">Téléphone</label>
+                      <input
+                        type="text"
+                        value={managerForm.telephone}
+                        onChange={(e) => setManagerForm(f => ({ ...f, telephone: e.target.value }))}
+                        placeholder="6 99 00 00 00"
+                        className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink mb-1.5">Mot de passe *</label>
+                      <input
+                        type="password"
+                        value={managerForm.password}
+                        onChange={(e) => setManagerForm(f => ({ ...f, password: e.target.value }))}
+                        placeholder="Mot de passe initial"
+                        className="w-full px-3.5 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 placeholder:text-ink-muted"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div className="px-6 py-4 border-t border-divider flex items-center justify-between gap-3">
+                {modalStep === 1 ? (
+                  <>
+                    <button
+                      onClick={closeModal}
+                      className="px-4 py-2.5 text-sm font-medium text-ink-muted hover:text-ink rounded-xl hover:bg-raised transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleCreateStation}
+                      disabled={createStation.isPending}
+                      className="px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {createStation.isPending ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                      Créer la station
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={closeModal}
+                      className="px-4 py-2.5 text-sm font-medium text-ink-muted hover:text-ink rounded-xl hover:bg-raised transition-colors"
+                    >
+                      Passer cette étape
+                    </button>
+                    <button
+                      onClick={handleCreateManager}
+                      disabled={createUser.isPending || assignStation.isPending}
+                      className="px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {(createUser.isPending || assignStation.isPending) ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />
+                      ) : (
+                        <Shield className="w-4 h-4" />
+                      )}
+                      Créer le manager
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

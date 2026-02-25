@@ -429,7 +429,7 @@ function CreateReservationModal({
       setNewVehicle({ immatriculation: '', brand: '', modele: '', color: '' })
       toast.success(`${client.nom} créé avec le véhicule ${vehicle.immatriculation}`)
     } catch {
-      toast.error('Erreur lors de la création du client')
+      // error displayed by axios interceptor
     }
   }
 

@@ -249,7 +249,7 @@ function CreateClientModal({ onClose, stationId }: { onClose: () => void; statio
       toast.success(`Client "${formData.nom}" créé avec succès !`)
       onClose()
     } catch {
-      toast.error('Erreur lors de la création du client')
+      // error displayed by axios interceptor
     }
   }
 

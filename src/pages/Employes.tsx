@@ -17,9 +17,10 @@ const roleCfg: Record<string, { label: string; cls: string }> = {
   controleur: { label: 'Contrôleur', cls: 'bg-info-wash text-info border-info-line' },
   caissiere: { label: 'Caissière', cls: 'bg-warn-wash text-warn border-warn-line' },
   laveur: { label: 'Laveur', cls: 'bg-accent-wash text-accent-bold border-accent-line' },
+  commercial: { label: 'Commercial', cls: 'bg-blue-500/10 text-blue-600 border-blue-200' },
 }
 
-const roleFilter = ['Tous', 'Admin', 'Manager', 'Contrôleur', 'Caissière', 'Laveur']
+const roleFilter = ['Tous', 'Admin', 'Manager', 'Contrôleur', 'Caissière', 'Laveur', 'Commercial']
 
 export default function Employes() {
   const { selectedStationId: authStationId, user: authUser } = useAuth()
@@ -86,7 +87,7 @@ export default function Employes() {
       setFormData({ nom: '', prenom: '', email: '', telephone: '', password: '', role: 'laveur' })
       setSelectedStationId('')
     } catch {
-      toast.error("Erreur lors de la création de l'employé")
+      // error displayed by axios interceptor
     }
   }
 
@@ -331,6 +332,7 @@ export default function Employes() {
                       <option value="laveur">Laveur</option>
                       <option value="caissiere">Caissière</option>
                       <option value="controleur">Contrôleur</option>
+                      <option value="commercial">Commercial</option>
                       {isSuperAdmin && <option value="manager">Manager</option>}
                       {isSuperAdmin && <option value="super_admin">Super Admin</option>}
                     </select>

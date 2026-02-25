@@ -8,6 +8,7 @@ export interface Station {
     activeEmployeesCount?: number;
     employeeCount?: number;
     managerName?: string;
+    objectifCommercialJournalier?: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -18,6 +19,7 @@ export interface CreateStationDto {
     town: string;
     contact?: string;
     status?: 'active' | 'upcoming' | 'inactive';
+    objectifCommercialJournalier?: number;
 }
 
 export interface UpdateStationDto extends Partial<CreateStationDto> { }
