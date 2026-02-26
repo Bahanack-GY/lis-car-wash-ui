@@ -32,6 +32,7 @@ const roleLabel: Record<UserRole, string> = {
   caissiere: 'Caissière',
   laveur: 'Laveur',
   commercial: 'Commercial',
+  comptable: 'Comptable',
 }
 
 const pageTitles: Record<string, string> = {

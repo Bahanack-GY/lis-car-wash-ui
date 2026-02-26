@@ -18,7 +18,8 @@ export interface UserProfile {
     email: string;
     nom: string;
     prenom: string;
-    role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial';
+    role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial' | 'comptable';
     telephone?: string;
+    globalAccess?: boolean;
     stationIds?: number[];  // affectation station IDs returned by login & /auth/me
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Plus, Search, Banknote, TrendingDown, TrendingUp, X, Pencil, ListFilter } from 'lucide-react'
+import { Sparkles, Plus, Search, Banknote, TrendingDown, TrendingUp, X, Pencil, ListFilter, Award } from 'lucide-react'
 import { useExtras, useCreateExtra, useUpdateExtra } from '@/api/extras'
 import type { ExtraService, CreateExtraServiceDto, UpdateExtraServiceDto } from '@/api/extras/types'
 import { useAuth } from '@/contexts/AuthContext'
@@ -12,9 +12,9 @@ function formatPrice(price: number | string) {
   return new Intl.NumberFormat('fr-FR').format(Number(price))
 }
 
-const emptyForm: CreateExtraServiceDto = { nom: '', prix: 0 }
+const emptyForm: CreateExtraServiceDto = { nom: '', prix: 0, bonus: undefined }
 
-export default function ServicesAdditionnels() {
+export default function ServicesSpeciaux() {
   const { selectedStationId } = useAuth()
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -63,6 +63,7 @@ export default function ServicesAdditionnels() {
     setFormData({
       nom: extra.nom,
       prix: Number(extra.prix),
+      bonus: extra.bonus != null ? Number(extra.bonus) : undefined,
     })
     setIsModalOpen(true)
   }
@@ -80,6 +81,8 @@ export default function ServicesAdditionnels() {
         const changes: UpdateExtraServiceDto = {}
         if (formData.nom !== editingExtra.nom) changes.nom = formData.nom
         if (formData.prix !== Number(editingExtra.prix)) changes.prix = formData.prix
+        const oldBonus = editingExtra.bonus != null ? Number(editingExtra.bonus) : undefined
+        if (formData.bonus !== oldBonus) changes.bonus = formData.bonus ?? null
         await updateExtra.mutateAsync({ id: editingExtra.id, data: changes })
       } else {
         await createExtra.mutateAsync({ ...formData, stationId: selectedStationId || undefined })
@@ -100,9 +103,9 @@ export default function ServicesAdditionnels() {
         <motion.div variants={rise} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold text-ink flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-accent" /> Services Additionnels
+              <Sparkles className="w-6 h-6 text-accent" /> Services Sp&eacute;ciaux
             </h1>
-            <p className="text-ink-faded mt-1">Gérez les services supplémentaires et leurs tarifs</p>
+            <p className="text-ink-faded mt-1">G&eacute;rez les services sp&eacute;ciaux et leurs tarifs</p>
           </div>
           <button
             onClick={openCreate}
@@ -146,11 +149,11 @@ export default function ServicesAdditionnels() {
           </div>
         ) : isError ? (
           <div className="p-4 bg-red-500/10 text-red-500 rounded-xl">
-            Erreur lors du chargement des services additionnels.
+            Erreur lors du chargement des services sp&eacute;ciaux.
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
-            {search ? 'Aucun service ne correspond à la recherche.' : 'Aucun service additionnel configuré. Commencez par en créer un.'}
+            {search ? 'Aucun service ne correspond à la recherche.' : 'Aucun service spécial configuré. Commencez par en créer un.'}
           </div>
         ) : (
           <motion.div
@@ -175,7 +178,7 @@ export default function ServicesAdditionnels() {
                       </div>
                       <div>
                         <h3 className="font-heading font-semibold text-ink">{extra.nom}</h3>
-                        <p className="text-xs text-ink-faded mt-0.5">Service additionnel</p>
+                        <p className="text-xs text-ink-faded mt-0.5">Service sp&eacute;cial</p>
                       </div>
                     </div>
                     <button
@@ -194,6 +197,13 @@ export default function ServicesAdditionnels() {
                     </div>
                     <p className="text-xs text-ink-muted">FCFA</p>
                   </div>
+
+                  {extra.bonus != null && Number(extra.bonus) > 0 && (
+                    <div className="mt-3 flex items-center gap-1.5 justify-center bg-amber-500/10 rounded-lg py-1.5 px-3">
+                      <Award className="w-3.5 h-3.5 text-amber-600" />
+                      <span className="text-xs font-medium text-amber-700">Bonus laveur : {formatPrice(extra.bonus)} F</span>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -221,7 +231,7 @@ export default function ServicesAdditionnels() {
               <div className="flex items-center justify-between px-6 py-4 border-b border-divider bg-inset">
                 <h3 className="font-heading font-bold text-lg text-ink flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-accent" />
-                  {editingExtra ? 'Modifier le service' : 'Nouveau service additionnel'}
+                  {editingExtra ? 'Modifier le service' : 'Nouveau service spécial'}
                 </h3>
                 <button
                   onClick={closeModal}
@@ -262,6 +272,20 @@ export default function ServicesAdditionnels() {
                     className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                     placeholder="2000"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ink-light mb-1.5">Bonus laveur (FCFA)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={50}
+                    value={formData.bonus ?? ''}
+                    onChange={(e) => setFormData({ ...formData, bonus: e.target.value ? Number(e.target.value) : undefined })}
+                    className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                    placeholder="500"
+                  />
+                  <p className="text-xs text-ink-muted mt-1">Bonus attribué au laveur pour ce service. Remplace le bonus par défaut de l'employé.</p>
                 </div>
 
                 <div className="pt-4 flex justify-end gap-3 border-t border-divider mt-6">

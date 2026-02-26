@@ -45,8 +45,9 @@ export interface User {
     prenom: string;
     email: string;
     telephone?: string;
-    role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial';
+    role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial' | 'comptable';
     actif: boolean;
+    globalAccess?: boolean;
     bonusParLavage?: number | null;
     objectifJournalier?: number | null;
     affectations?: Affectation[];
@@ -70,9 +71,10 @@ export interface CreateUserDto {
     email: string;
     telephone?: string;
     password?: string;
-    role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial';
+    role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial' | 'comptable';
     bonusParLavage?: number;
     objectifJournalier?: number;
+    globalAccess?: boolean;
 }
 
 export interface UpdateUserDto extends Partial<Omit<CreateUserDto, 'role'>> { }
@@ -87,7 +89,7 @@ export interface TransferStationDto {
 }
 
 export interface UserFilters {
-    role?: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial';
+    role?: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial' | 'comptable';
     stationId?: number;
     search?: string;
     page?: number;

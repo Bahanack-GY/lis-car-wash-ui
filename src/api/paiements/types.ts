@@ -2,12 +2,15 @@ export interface Paiement {
     id: number;
     factureId?: number;
     userId?: number;
-    methode: 'cash' | 'card' | 'wave' | 'orange_money' | 'transfer';
+    methode: 'cash' | 'card' | 'wave' | 'orange_money' | 'transfer' | 'bond';
     montant: number;
     referenceExterne?: string;
     type: 'income' | 'expense';
     description?: string;
     stationId?: number;
+    couponId?: number;
+    categorie?: string;
+    justificatif?: string;
     user?: { id: number; nom: string; prenom: string; role: string };
     createdAt: string;
 }
@@ -31,18 +34,23 @@ export interface CaisseSummary {
 
 export interface CreatePaiementDto {
     factureId?: number;
-    methode: 'cash' | 'card' | 'wave' | 'orange_money' | 'transfer';
+    methode: 'cash' | 'card' | 'wave' | 'orange_money' | 'transfer' | 'bond';
     montant: number;
     referenceExterne?: string;
     type: 'income' | 'expense';
     description?: string;
     stationId?: number;
+    couponId?: number;
+    categorie?: string;
+    justificatif?: string;
 }
 
 export interface TransactionFilters {
     stationId: number;
     userId?: number;
     date?: string;
+    startDate?: string;
+    endDate?: string;
     type?: 'income' | 'expense';
     page?: number;
     limit?: number;

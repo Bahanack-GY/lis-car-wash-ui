@@ -111,7 +111,7 @@ export default function SelectStation() {
   }), [stationsList])
 
   useEffect(() => {
-    if (user && user.role !== 'super_admin') {
+    if (user && user.role !== 'super_admin' && !(user.role === 'comptable' && user.globalAccess)) {
       navigate(defaultPath, { replace: true })
     }
   }, [user, defaultPath, navigate])
@@ -182,6 +182,8 @@ export default function SelectStation() {
     controleur: 'Contrôleur',
     caissiere: 'Caissière',
     laveur: 'Laveur',
+    commercial: 'Commercial',
+    comptable: 'Comptable',
   }
 
   return (
@@ -245,13 +247,15 @@ export default function SelectStation() {
                 <BarChart3 className="w-4 h-4 text-accent" />
                 Tableau de bord global
               </button>
-              <button
-                onClick={openModal}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 hover:shadow-md transition-all duration-200"
-              >
-                <Plus className="w-4 h-4" />
-                Nouvelle station
-              </button>
+              {user?.role === 'super_admin' && (
+                <button
+                  onClick={openModal}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 hover:shadow-md transition-all duration-200"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nouvelle station
+                </button>
+              )}
             </div>
           </div>
 

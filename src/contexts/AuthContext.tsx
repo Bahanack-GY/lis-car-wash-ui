@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import { authApi } from '@/api/auth/api'
 import type { UserProfile } from '@/api/auth/types'
 
-export type UserRole = 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial'
+export type UserRole = 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial' | 'comptable'
 
 interface AuthContextValue {
   user: UserProfile | null
@@ -19,6 +19,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 function autoStation(profile: UserProfile): number | null {
   if (profile.role === 'super_admin') return null
+  if (profile.role === 'comptable' && profile.globalAccess) return null
   return profile.stationIds?.[0] ?? null
 }
 

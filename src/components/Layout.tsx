@@ -5,13 +5,15 @@ import {
   LayoutDashboard, CalendarDays, ClipboardList, Ticket, CreditCard,
   Users, Package, UserCog, Building2, Search, Bell, LogOut,
   ChevronLeft, Menu, Plus, Sun, Moon, Star, Droplets, Sparkles, MapPin, Check, ChevronsUpDown, Clock, AlertTriangle,
-  Megaphone, BarChart3, ScrollText,
+  Megaphone, BarChart3, ScrollText, Ban, Info, ShieldAlert, Zap, AlertCircle, CheckCircle2, X, Gift,
 } from 'lucide-react'
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth, type UserRole } from '@/contexts/AuthContext'
 import { useStations } from '@/api/stations'
-import { useActiveIncidentsByStation } from '@/api/incidents'
+import { useActiveIncidentsByStation, useIncidents, useUpdateIncident } from '@/api/incidents'
+import type { Incident, IncidentSeverity } from '@/api/incidents'
+import toast from 'react-hot-toast'
 
 interface NavItem {
   path: string
@@ -21,17 +23,19 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { path: '/dashboard',     label: 'Tableau de bord',  icon: LayoutDashboard, roles: ['super_admin', 'manager'] },
+  { path: '/dashboard',     label: 'Tableau de bord',  icon: LayoutDashboard, roles: ['super_admin', 'manager', 'comptable'] },
   { path: '/nouveau-lavage',label: 'Nouveau Lavage',    icon: Plus,            roles: ['super_admin', 'manager', 'controleur'] },
   { path: '/reservations',  label: 'Réservations',      icon: CalendarDays,    roles: ['super_admin', 'manager', 'controleur', 'caissiere'] },
   { path: '/fiches-piste',  label: 'Fiches de Piste',   icon: ClipboardList,   roles: ['super_admin', 'manager', 'controleur'] },
-  { path: '/coupons',       label: 'Coupons',           icon: Ticket,          roles: ['super_admin', 'manager', 'controleur', 'caissiere'] },
-  { path: '/caisse',        label: 'Caisse',            icon: CreditCard,      roles: ['super_admin', 'manager', 'caissiere'] },
+  { path: '/coupons',       label: 'Coupons',           icon: Ticket,          roles: ['super_admin', 'manager', 'controleur', 'caissiere', 'comptable'] },
+  { path: '/caisse',        label: 'Caisse',            icon: CreditCard,      roles: ['super_admin', 'manager', 'caissiere', 'comptable'] },
+  { path: '/depenses',      label: 'Dépenses',          icon: CreditCard,      roles: ['super_admin', 'manager', 'caissiere', 'comptable'] },
+  { path: '/bons-lavage',   label: 'Bons de Lavage',    icon: Gift,            roles: ['super_admin', 'manager'] },
   { path: '/clients',       label: 'Clients',           icon: Users,           roles: ['super_admin', 'manager', 'controleur', 'caissiere'] },
   { path: '/inventaire',    label: 'Inventaire',        icon: Package,         roles: ['super_admin', 'manager'] },
   { path: '/incidents',     label: 'Incidents',          icon: AlertTriangle,   roles: ['super_admin', 'manager'] },
   { path: '/types-lavage',  label: 'Types de Lavage',   icon: Droplets,        roles: ['super_admin', 'manager'] },
-  { path: '/services-additionnels', label: 'Services Add.', icon: Sparkles,    roles: ['super_admin', 'manager'] },
+  { path: '/services-speciaux', label: 'Services Spé.', icon: Sparkles,    roles: ['super_admin', 'manager'] },
   { path: '/employes',      label: 'Employés',          icon: UserCog,         roles: ['super_admin', 'manager'] },
   { path: '/marketing',     label: 'Marketing',         icon: Megaphone,       roles: ['super_admin', 'manager'] },
   { path: '/stations',      label: 'Stations',          icon: Building2,       roles: ['super_admin'] },
@@ -48,7 +52,19 @@ const roleLabel: Record<UserRole, string> = {
   caissiere: 'Caissière',
   laveur: 'Laveur',
   commercial: 'Commercial',
+  comptable: 'Comptable',
 }
+
+/* ─── Severity config for incident modal ──────────────────────────── */
+const severityConfig: Record<IncidentSeverity, { label: string; color: string; bg: string; icon: React.ElementType; gradient: string }> = {
+  low:      { label: 'Faible',   color: 'text-blue-600',   bg: 'bg-blue-500/10',   icon: Info,        gradient: 'from-blue-500 to-sky-500' },
+  medium:   { label: 'Moyen',    color: 'text-amber-600',  bg: 'bg-amber-500/10',  icon: AlertCircle, gradient: 'from-amber-500 to-yellow-500' },
+  high:     { label: 'Élevé',    color: 'text-orange-600', bg: 'bg-orange-500/10', icon: ShieldAlert, gradient: 'from-orange-500 to-red-400' },
+  critical: { label: 'Critique', color: 'text-red-600',    bg: 'bg-red-500/10',    icon: Zap,         gradient: 'from-red-600 to-red-500' },
+}
+
+const formatIncidentDate = (iso: string) =>
+  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -65,6 +81,35 @@ export default function Layout() {
   const stations = stationsList || []
   const { data: incidentStatusMap } = useActiveIncidentsByStation()
   const currentStation = stations.find(s => s.id === selectedStationId)
+
+  // ─── Incident check modal ──────────────────────────────────────────
+  const [incidentModalDismissed, setIncidentModalDismissed] = useState(false)
+
+  const { data: stationIncidentsData } = useIncidents(
+    selectedStationId ? { stationId: selectedStationId, limit: 50 } : undefined,
+  )
+  const updateIncident = useUpdateIncident()
+
+  const activeIncidents: Incident[] = useMemo(() => {
+    if (!stationIncidentsData) return []
+    const list = Array.isArray(stationIncidentsData)
+      ? stationIncidentsData
+      : (stationIncidentsData as any).data ?? []
+    return list.filter((i: Incident) => i.statut !== 'resolved')
+  }, [stationIncidentsData])
+
+  const showIncidentModal =
+    activeIncidents.length > 0 &&
+    !incidentModalDismissed &&
+    !!selectedStationId &&
+    hasRole('super_admin', 'manager', 'controleur')
+
+  const handleResolveIncident = (id: number) => {
+    updateIncident.mutate(
+      { id, data: { statut: 'resolved', resolvedAt: new Date().toISOString() } },
+      { onSuccess: () => toast.success('Incident résolu'), onError: () => toast.error('Erreur lors de la mise à jour') },
+    )
+  }
 
   const filteredStations = useMemo(() => {
     if (!stationSearch.trim()) return stations
@@ -129,6 +174,103 @@ export default function Layout() {
             className="fixed inset-0 bg-black/30 z-40 lg:hidden"
             onClick={() => setMobileOpen(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Incident check modal */}
+      <AnimatePresence>
+        {showIncidentModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              className="relative bg-panel border border-edge rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 border-b border-edge flex-shrink-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2.5 rounded-xl bg-red-500/10">
+                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-semibold text-ink text-base">
+                      Incidents actifs sur votre station
+                    </h3>
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      {currentStation?.nom ?? 'Station'} — {activeIncidents.length} incident{activeIncidents.length > 1 ? 's' : ''} non résolu{activeIncidents.length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Incident list */}
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                {activeIncidents.map((incident) => {
+                  const sev = severityConfig[incident.severity]
+                  const SevIcon = sev.icon
+                  return (
+                    <div
+                      key={incident.id}
+                      className="bg-inset border border-edge rounded-xl p-4 space-y-2.5"
+                    >
+                      {/* Severity + date row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1 rounded-lg bg-gradient-to-br ${sev.gradient}`}>
+                            <SevIcon className="w-3.5 h-3.5 text-white" />
+                          </div>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold ${sev.bg} ${sev.color}`}>
+                            {sev.label}
+                          </span>
+                          {incident.stopsActivity && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-red-500/10 text-red-600 border border-red-500/20">
+                              <Ban className="w-2.5 h-2.5" />
+                              Arrête l'activité
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-ink-muted">{formatIncidentDate(incident.dateDeclaration)}</span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-sm text-ink line-clamp-2">{incident.description}</p>
+
+                      {/* Resolve button */}
+                      <button
+                        onClick={() => handleResolveIncident(incident.id)}
+                        disabled={updateIncident.isPending}
+                        className="w-full flex items-center justify-center gap-1.5 text-xs font-medium py-2 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Marquer comme résolu
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-edge flex-shrink-0">
+                <button
+                  onClick={() => setIncidentModalDismissed(true)}
+                  className="w-full py-2.5 rounded-xl text-sm font-medium text-ink-muted hover:text-ink bg-raised hover:bg-inset border border-edge transition-colors"
+                >
+                  Les incidents sont toujours actifs
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

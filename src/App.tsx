@@ -16,7 +16,7 @@ import Employes from '@/pages/Employes'
 import EmployeDetail from '@/pages/EmployeDetail'
 import Stations from '@/pages/Stations'
 import TypesLavage from '@/pages/TypesLavage'
-import ServicesAdditionnels from '@/pages/ServicesAdditionnels'
+import ServicesSpeciaux from '@/pages/ServicesSpeciaux'
 import Incidents from '@/pages/Incidents'
 import NouveauLavage from '@/pages/NouveauLavage'
 import SelectStation from '@/pages/SelectStation'
@@ -26,6 +26,8 @@ import Commercial from '@/pages/Commercial'
 import CommercialAnalytics from '@/pages/CommercialAnalytics'
 import Marketing from '@/pages/Marketing'
 import AuditLogs from '@/pages/AuditLogs'
+import BonsLavage from '@/pages/BonsLavage'
+import Depenses from '@/pages/Depenses'
 import AdminLayout from '@/components/AdminLayout'
 import AdminEmployees from '@/pages/admin/AdminEmployees'
 import AdminClients from '@/pages/admin/AdminClients'
@@ -54,7 +56,7 @@ export default function App() {
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           <Route path="/dashboard" element={
-            <ProtectedRoute roles={['super_admin', 'manager']}>
+            <ProtectedRoute roles={['super_admin', 'manager', 'comptable']}>
               <Dashboard />
             </ProtectedRoute>
           } />
@@ -78,20 +80,26 @@ export default function App() {
           } />
 
           <Route path="/coupons" element={
-            <ProtectedRoute roles={['super_admin', 'manager', 'controleur', 'caissiere']}>
+            <ProtectedRoute roles={['super_admin', 'manager', 'controleur', 'caissiere', 'comptable']}>
               <Coupons />
             </ProtectedRoute>
           } />
 
           <Route path="/coupons/:id" element={
-            <ProtectedRoute roles={['super_admin', 'manager', 'controleur', 'caissiere']}>
+            <ProtectedRoute roles={['super_admin', 'manager', 'controleur', 'caissiere', 'comptable']}>
               <CouponDetail />
             </ProtectedRoute>
           } />
 
           <Route path="/caisse" element={
-            <ProtectedRoute roles={['super_admin', 'manager', 'caissiere']}>
+            <ProtectedRoute roles={['super_admin', 'manager', 'caissiere', 'comptable']}>
               <Caisse />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/depenses" element={
+            <ProtectedRoute roles={['super_admin', 'manager', 'caissiere', 'comptable']}>
+              <Depenses />
             </ProtectedRoute>
           } />
 
@@ -137,9 +145,9 @@ export default function App() {
             </ProtectedRoute>
           } />
 
-          <Route path="/services-additionnels" element={
+          <Route path="/services-speciaux" element={
             <ProtectedRoute roles={['super_admin', 'manager']}>
-              <ServicesAdditionnels />
+              <ServicesSpeciaux />
             </ProtectedRoute>
           } />
 
@@ -170,6 +178,12 @@ export default function App() {
           <Route path="/marketing" element={
             <ProtectedRoute roles={['super_admin', 'manager']}>
               <Marketing />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/bons-lavage" element={
+            <ProtectedRoute roles={['super_admin', 'manager']}>
+              <BonsLavage />
             </ProtectedRoute>
           } />
 

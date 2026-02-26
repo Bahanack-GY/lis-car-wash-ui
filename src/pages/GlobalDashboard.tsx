@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   Building2,
   AlertTriangle,
+  TrendingDown,
   Trophy,
   Loader2,
   MoreHorizontal,
@@ -186,6 +187,7 @@ export default function GlobalDashboard() {
 
   const statCards = [
     { label: 'Revenu total', value: stats?.totalRevenue?.toLocaleString() || '0', unit: 'FCFA', icon: Wallet, accent: 'bg-teal-500/10 text-accent' },
+    { label: 'Dépenses totales', value: stats?.totalExpenses?.toLocaleString() || '0', unit: 'FCFA', icon: TrendingDown, accent: 'bg-red-500/10 text-red-600' },
     { label: 'Véhicules lavés', value: stats?.totalVehicules?.toString() || '0', unit: unitLabel, icon: Car, accent: 'bg-blue-500/10 text-info' },
     { label: 'Lavages en cours', value: stats?.totalLavagesActifs?.toString() || '0', unit: 'actifs', icon: Droplets, accent: 'bg-purple-500/10 text-grape' },
     { label: 'Réservations', value: stats?.totalReservations?.toString() || '0', unit: unitLabel, icon: CalendarCheck, accent: 'bg-amber-500/10 text-warn' },
@@ -256,7 +258,7 @@ export default function GlobalDashboard() {
             </motion.div>
 
             {/* Stat cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {statCards.map((s) => {
                 const Icon = s.icon
                 return (

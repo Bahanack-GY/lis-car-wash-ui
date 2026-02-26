@@ -18,9 +18,10 @@ const roleCfg: Record<string, { label: string; cls: string }> = {
   caissiere: { label: 'Caissière', cls: 'bg-warn-wash text-warn border-warn-line' },
   laveur: { label: 'Laveur', cls: 'bg-accent-wash text-accent-bold border-accent-line' },
   commercial: { label: 'Commercial', cls: 'bg-blue-500/10 text-blue-600 border-blue-200' },
+  comptable: { label: 'Comptable', cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' },
 }
 
-const roleFilter = ['Tous', 'Admin', 'Manager', 'Contrôleur', 'Caissière', 'Laveur', 'Commercial']
+const roleFilter = ['Tous', 'Admin', 'Manager', 'Contrôleur', 'Caissière', 'Laveur', 'Commercial', 'Comptable']
 
 export default function Employes() {
   const { selectedStationId: authStationId, user: authUser } = useAuth()
@@ -84,7 +85,7 @@ export default function Employes() {
 
       toast.success(`${formData.prenom} ${formData.nom} ajouté avec succès !`)
       setIsModalOpen(false)
-      setFormData({ nom: '', prenom: '', email: '', telephone: '', password: '', role: 'laveur', bonusParLavage: undefined, objectifJournalier: undefined })
+      setFormData({ nom: '', prenom: '', email: '', telephone: '', password: '', role: 'laveur', bonusParLavage: undefined, objectifJournalier: undefined, globalAccess: undefined })
       setSelectedStationId('')
     } catch {
       // error displayed by axios interceptor
@@ -326,39 +327,65 @@ export default function Employes() {
                     <label className="block text-sm font-medium text-ink-light mb-1.5">Rôle *</label>
                     <select
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as any, bonusParLavage: undefined, objectifJournalier: undefined })}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as any, bonusParLavage: undefined, objectifJournalier: undefined, globalAccess: undefined })}
                       className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                     >
                       <option value="laveur">Laveur</option>
                       <option value="caissiere">Caissière</option>
                       <option value="controleur">Contrôleur</option>
                       <option value="commercial">Commercial</option>
+                      <option value="comptable">Comptable</option>
                       {isSuperAdmin && <option value="manager">Manager</option>}
                       {isSuperAdmin && <option value="super_admin">Super Admin</option>}
                     </select>
                   </div>
                 </div>
 
+                {/* Comptable: global access toggle */}
+                {formData.role === 'comptable' && (
+                  <div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <div
+                        onClick={() => setFormData({ ...formData, globalAccess: !formData.globalAccess })}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${formData.globalAccess ? 'bg-emerald-500' : 'bg-raised border border-edge'}`}
+                      >
+                        <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${formData.globalAccess ? 'translate-x-5' : ''}`} />
+                      </div>
+                      <span className="text-sm font-medium text-ink">Accès global (toutes les stations)</span>
+                    </label>
+                    <p className="text-xs text-ink-muted mt-1">
+                      {formData.globalAccess
+                        ? 'La comptable pourra consulter les données de toutes les stations'
+                        : 'La comptable sera limitée à une station spécifique'}
+                    </p>
+                  </div>
+                )}
+
                 {/* Station assignment */}
-                <div>
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-ink-light mb-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> Station {formData.role === 'manager' && '*'}
-                  </label>
-                  <select
-                    required={formData.role === 'manager'}
-                    value={selectedStationId}
-                    onChange={(e) => setSelectedStationId(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
-                  >
-                    <option value="">— Aucune station —</option>
-                    {stations.map((s) => (
-                      <option key={s.id} value={s.id}>{s.nom} — {s.town}</option>
-                    ))}
-                  </select>
-                  {formData.role === 'manager' && !selectedStationId && (
-                    <p className="text-xs text-warn mt-1">Un manager doit être assigné à une station</p>
-                  )}
-                </div>
+                {!(formData.role === 'comptable' && formData.globalAccess) && (
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-ink-light mb-1.5">
+                      <MapPin className="w-3.5 h-3.5" /> Station {(formData.role === 'manager' || (formData.role === 'comptable' && !formData.globalAccess)) && '*'}
+                    </label>
+                    <select
+                      required={formData.role === 'manager' || (formData.role === 'comptable' && !formData.globalAccess)}
+                      value={selectedStationId}
+                      onChange={(e) => setSelectedStationId(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                    >
+                      <option value="">— Aucune station —</option>
+                      {stations.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nom} — {s.town}</option>
+                      ))}
+                    </select>
+                    {formData.role === 'manager' && !selectedStationId && (
+                      <p className="text-xs text-warn mt-1">Un manager doit être assigné à une station</p>
+                    )}
+                    {formData.role === 'comptable' && !formData.globalAccess && !selectedStationId && (
+                      <p className="text-xs text-warn mt-1">Une comptable sans accès global doit être assignée à une station</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Role-specific fields */}
                 {formData.role === 'laveur' && (

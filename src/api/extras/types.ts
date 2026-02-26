@@ -3,6 +3,7 @@ export interface ExtraService {
     stationId?: number;
     nom: string;
     prix: number;
+    bonus?: number | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -10,6 +11,7 @@ export interface ExtraService {
 export interface CreateExtraServiceDto {
     nom: string;
     prix: number;
+    bonus?: number | null;
     stationId?: number;
 }
 

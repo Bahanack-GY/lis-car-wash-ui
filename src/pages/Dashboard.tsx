@@ -6,6 +6,7 @@ import {
   Droplets,
   CalendarCheck,
   TrendingUp,
+  TrendingDown,
   MoreHorizontal,
   ArrowUpRight,
   Loader2,
@@ -163,6 +164,7 @@ export default function Dashboard() {
 
   const statCards = [
     { label: 'Revenu', value: stats?.revenue?.toLocaleString() || '0', unit: 'FCFA', change: '', icon: Wallet, accent: 'bg-teal-500/10 text-accent' },
+    { label: 'Dépenses', value: stats?.expenses?.toLocaleString() || '0', unit: 'FCFA', change: '', icon: TrendingDown, accent: 'bg-red-500/10 text-red-600' },
     { label: 'Véhicules lavés', value: stats?.vehicules?.toString() || '0', unit: unitLabel, change: '', icon: Car, accent: 'bg-blue-500/10 text-info' },
     { label: 'Lavages en cours', value: stats?.lavagesActifs?.toString() || '0', unit: 'actifs', change: '', icon: Droplets, accent: 'bg-purple-500/10 text-grape' },
     { label: 'Réservations', value: stats?.reservations?.toString() || '0', unit: unitLabel, change: '', icon: CalendarCheck, accent: 'bg-amber-500/10 text-warn' },
@@ -227,7 +229,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {statCards.map((s) => {
            const Icon = s.icon
            return (

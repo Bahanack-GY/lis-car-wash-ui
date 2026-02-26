@@ -1,5 +1,6 @@
 export interface DashboardStats {
     revenue: number;
+    expenses: number;
     vehicules: number;
     lavagesActifs: number;
     reservations: number;
@@ -36,6 +37,7 @@ export interface WashTypeDistribution {
 
 export interface GlobalStats {
     totalRevenue: number;
+    totalExpenses: number;
     totalVehicules: number;
     totalLavagesActifs: number;
     totalReservations: number;

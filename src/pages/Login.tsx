@@ -24,8 +24,8 @@ export default function Login() {
       // Store token + user in context/localStorage
       login(access_token, refresh_token, profile)
 
-      if (profile.role === 'super_admin') {
-        // Owner picks their station manually
+      if (profile.role === 'super_admin' || (profile.role === 'comptable' && profile.globalAccess)) {
+        // Owner / global comptable picks their station manually
         navigate('/select-station')
       } else {
         // Everyone else is tied to their affectation station — auto-set it

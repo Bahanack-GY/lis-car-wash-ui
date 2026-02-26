@@ -16,4 +16,13 @@ export const paiementsApi = {
         const response = await apiClient.post<Paiement>('/caisse/transactions', data);
         return response.data;
     },
+
+    uploadJustificatif: async (file: File): Promise<{ path: string }> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post<{ path: string }>('/caisse/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+    },
 };

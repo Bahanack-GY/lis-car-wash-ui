@@ -29,6 +29,8 @@ import { useUsers } from '@/api/users'
 import { useCreateNouveauLavage } from '@/api/fiches-piste'
 import { useCoupons } from '@/api/coupons'
 import { useAuth } from '@/contexts/AuthContext'
+import { useApplicablePromotions } from '@/api/promotions/queries'
+import type { ApplicablePromotion } from '@/api/promotions/types'
 
 /* ================================================================
    ICONS MAPPING
@@ -172,6 +174,7 @@ export default function NouveauLavage() {
   // ── Step 3 — Washers (multi-select) ─────────────
   const [pickedWasherIds, setPickedWasherIds] = useState<number[]>([])
   const [busyWasherConfirm, setBusyWasherConfirm] = useState<number | null>(null) // washer ID pending confirmation
+  const [appliedPromotionId, setAppliedPromotionId] = useState<number | null>(null)
 
   const toggleWasher = (id: number) =>
     setPickedWasherIds((prev) =>
@@ -181,12 +184,37 @@ export default function NouveauLavage() {
   // ── Derived data ─────────────────────────────────
   const wash = washTypes.find((w) => w.id === washId) ?? null
   const selectedExtras = availableExtras.filter((e) => selectedExtrasIds.includes(e.id))
-  
+
   const total = useMemo(() => {
     let s = Number(wash?.prixBase) || 0
     selectedExtras.forEach((e) => (s += Number(e.prix) || 0))
     return s
   }, [wash, selectedExtras])
+
+  // ── Promotions ─────────────────────────────────────
+  const { data: applicablePromotions } = useApplicablePromotions({
+    clientId: selectedClientId ?? 0,
+    typeLavageId: washId ?? 0,
+    stationId: selectedStationId ?? 0,
+    extrasIds: selectedExtrasIds.length > 0 ? selectedExtrasIds : undefined,
+  })
+
+  const appliedPromo = useMemo<ApplicablePromotion | null>(() => {
+    if (!applicablePromotions?.length) return null
+    return applicablePromotions.find((p) => p.promotion.id === appliedPromotionId) ?? null
+  }, [applicablePromotions, appliedPromotionId])
+
+  const discount = appliedPromo?.effectiveDiscount ?? 0
+  const discountedTotal = total - discount
+
+  // Auto-apply best promo when available promotions change
+  useEffect(() => {
+    if (applicablePromotions && applicablePromotions.length > 0) {
+      setAppliedPromotionId(applicablePromotions[0].promotion.id)
+    } else {
+      setAppliedPromotionId(null)
+    }
+  }, [applicablePromotions])
 
   const selectedClientRecord = clientsList.find(c => c.id === selectedClientId)
   const clientNameDisplay = isNewClient ? newName : selectedClientRecord?.nom ?? ''
@@ -270,6 +298,7 @@ export default function NouveauLavage() {
         washerIds: pickedWasherIds,
         date: new Date().toISOString().split('T')[0],
         etatLieu: etatLieuStr,
+        promotionId: appliedPromotionId ?? undefined,
       })
 
       // Stay on step 4 — show real coupon number
@@ -388,7 +417,7 @@ export default function NouveauLavage() {
                     </div>
 
                     <div>
-                      <h4 className="font-heading font-medium text-ink text-sm mb-3">Services additionnels</h4>
+                      <h4 className="font-heading font-medium text-ink text-sm mb-3">Services spéciaux</h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {availableExtras.map((e) => {
                           const on = selectedExtrasIds.includes(e.id)
@@ -756,10 +785,29 @@ export default function NouveauLavage() {
                         ))}
                       </div>
 
+                      {discount > 0 && (
+                        <div className="flex justify-between text-sm mb-1 text-emerald-600">
+                          <span className="flex items-center gap-1">
+                            <Zap className="w-3 h-3" />
+                            {appliedPromo?.promotion.nom}
+                          </span>
+                          <span>-{discount.toLocaleString()} F</span>
+                        </div>
+                      )}
+                      {appliedPromo?.promotion.type === 'service_offert' && (
+                        <div className="flex justify-between text-sm mb-1 text-emerald-600">
+                          <span className="flex items-center gap-1">
+                            <Zap className="w-3 h-3" />
+                            {appliedPromo.promotion.nom}
+                          </span>
+                          <span className="text-xs font-medium">Service offert</span>
+                        </div>
+                      )}
+
                       <div className="border-t-2 border-gray-900 pt-2 mb-4">
                         <div className="flex justify-between">
                           <span className="font-heading font-bold text-lg text-gray-900">TOTAL</span>
-                          <span className="font-heading font-bold text-lg text-gray-900">{total.toLocaleString()} FCFA</span>
+                          <span className="font-heading font-bold text-lg text-gray-900">{discountedTotal.toLocaleString()} FCFA</span>
                         </div>
                       </div>
 
@@ -899,9 +947,10 @@ export default function NouveauLavage() {
     ${wash ? `<div class="svc-row"><span class="svc-name">${wash.nom}</span><span class="svc-price">${wash.prixBase.toLocaleString()} F</span></div>` : ''}
     ${extrasHtml}
   </div>
+  ${discount > 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;color:#059669"><span>⚡ ${appliedPromo?.promotion.nom ?? 'Promotion'}</span><span>-${discount.toLocaleString()} F</span></div>` : ''}
   <div class="total-row">
     <span>TOTAL</span>
-    <span>${total.toLocaleString()} FCFA</span>
+    <span>${discountedTotal.toLocaleString()} FCFA</span>
   </div>
   <div class="section washers">
     <p class="section-label">Laveurs assignés</p>
@@ -1011,11 +1060,43 @@ export default function NouveauLavage() {
               )}
             </div>
 
-            <div className="border-t border-divider pt-4">
-              <div className="flex items-center justify-between">
-                <span className="font-heading font-bold text-ink">Total</span>
-                <span className="font-heading font-bold text-xl text-accent">{total.toLocaleString()} FCFA</span>
+            {/* Promotion banner */}
+            {appliedPromo && (
+              <div className="mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-xs font-semibold text-emerald-700">{appliedPromo.promotion.nom}</span>
+                </div>
+                <p className="text-xs text-emerald-600">
+                  {appliedPromo.promotion.type === 'service_offert'
+                    ? `${appliedPromo.promotion.serviceSpecial?.nom ?? 'Service'} offert`
+                    : `-${discount.toLocaleString()} FCFA de remise`}
+                </p>
               </div>
+            )}
+
+            <div className="border-t border-divider pt-4">
+              {discount > 0 ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-ink-muted">Sous-total</span>
+                    <span className="text-ink-muted line-through">{total.toLocaleString()} FCFA</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-emerald-600">Remise</span>
+                    <span className="text-emerald-600">-{discount.toLocaleString()} FCFA</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="font-heading font-bold text-ink">Total</span>
+                    <span className="font-heading font-bold text-xl text-accent">{discountedTotal.toLocaleString()} FCFA</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="font-heading font-bold text-ink">Total</span>
+                  <span className="font-heading font-bold text-xl text-accent">{total.toLocaleString()} FCFA</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

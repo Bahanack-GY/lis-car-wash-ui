@@ -12,11 +12,15 @@ export interface Coupon {
         vehicle?: { id?: number; immatriculation: string; modele?: string; brand?: string; color?: string; type?: string };
         client?: { id?: number; nom: string; contact?: string; email?: string };
         typeLavage?: { id?: number; nom: string; prixBase: number; particularites?: string; dureeEstimee?: number };
-        extras?: { id: number; nom: string; prix: number }[];
+        extras?: { id: number; nom: string; prix: number; bonus?: number }[];
         station?: { id: number; nom: string; adresse?: string };
         controleur?: { id: number; nom: string; prenom: string };
     };
     washers?: { id: number; nom: string; prenom: string; email?: string; telephone?: string }[];
+    paiements?: { id: number; methode: string; montant: number; description?: string; referenceExterne?: string }[];
+    promotionId?: number;
+    remise?: number;
+    promotion?: { id: number; nom: string; type: string; discountType?: string; discountValue?: number; serviceSpecialId?: number } | null;
     createdAt: string;
     updatedAt: string;
 }

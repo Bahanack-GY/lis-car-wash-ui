@@ -42,6 +42,11 @@ import {
   MailX,
   CircleDot,
   Zap,
+  Calendar,
+  Gift,
+  Percent,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react'
 import {
   useMarketingInsights,
@@ -66,6 +71,16 @@ import type {
   Campaign,
   CampaignStatus,
 } from '@/api/marketing/types'
+import {
+  usePromotions,
+  useCreatePromotion,
+  useUpdatePromotion,
+  useTogglePromotion,
+} from '@/api/promotions/queries'
+import type { Promotion, CreatePromotionDto } from '@/api/promotions/types'
+import { useWashTypes } from '@/api/wash-types/queries'
+import { useExtras } from '@/api/extras/queries'
+import { useStations } from '@/api/stations/queries'
 
 /* ─── Animations ──────────────────────────────────────────────────── */
 
@@ -107,7 +122,7 @@ const sortOptions = [
   { value: 'nom', label: 'Nom' },
 ] as const
 
-type TabKey = 'clients' | 'campaigns' | 'templates'
+type TabKey = 'clients' | 'campaigns' | 'templates' | 'promotions'
 
 const statusConfig: Record<CampaignStatus, { label: string; bg: string; text: string; icon: React.ElementType }> = {
   draft: { label: 'Brouillon', bg: 'bg-raised', text: 'text-ink-muted', icon: FileText },
@@ -177,6 +192,14 @@ export default function Marketing() {
   const [templateForm, setTemplateForm] = useState<CreateTemplateDto>({ nom: '', contenu: '' })
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
 
+  /* ─── Promotion tab state ─── */
+  const [showPromoModal, setShowPromoModal] = useState(false)
+  const [editingPromo, setEditingPromo] = useState<Promotion | null>(null)
+  const [promoForm, setPromoForm] = useState<CreatePromotionDto>({
+    nom: '', type: 'discount', discountType: 'percentage', discountValue: 0,
+    minVisits: 0, startDate: '', endDate: '', washTypeIds: [],
+  })
+
   /* ─── Queries ─── */
   const { data: insights, isLoading: insightsLoading } = useMarketingInsights()
   const { data: segments, isLoading: segmentsLoading } = useMarketingSegments()
@@ -186,12 +209,21 @@ export default function Marketing() {
   const { data: campaignsData, isLoading: campaignsLoading } = useCampaigns(campaignPage)
   const { data: expandedDetail } = useCampaignDetail(expandedCampaignId ?? 0)
 
+  /* ─── Promotions queries ─── */
+  const { data: promotions, isLoading: promotionsLoading } = usePromotions()
+  const { data: washTypes } = useWashTypes()
+  const { data: extras } = useExtras()
+  const { data: stations } = useStations()
+
   /* ─── Mutations ─── */
   const createTemplate = useCreateTemplate()
   const updateTemplate = useUpdateTemplate()
   const deleteTemplate = useDeleteTemplate()
   const createCampaign = useCreateCampaign()
   const sendCampaign = useSendCampaign()
+  const createPromotion = useCreatePromotion()
+  const updatePromotion = useUpdatePromotion()
+  const togglePromotion = useTogglePromotion()
 
   const clients = clientsData?.data ?? []
   const totalPages = clientsData?.totalPages ?? 1
@@ -325,6 +357,74 @@ export default function Marketing() {
     }))
   }, [])
 
+  const openNewPromo = () => {
+    setEditingPromo(null)
+    setPromoForm({
+      nom: '', type: 'discount', discountType: 'percentage', discountValue: 0,
+      minVisits: 0, startDate: '', endDate: '', washTypeIds: [],
+    })
+    setShowPromoModal(true)
+  }
+
+  const openEditPromo = (promo: Promotion) => {
+    setEditingPromo(promo)
+    setPromoForm({
+      nom: promo.nom,
+      description: promo.description ?? undefined,
+      type: promo.type,
+      discountType: promo.discountType ?? 'percentage',
+      discountValue: promo.discountValue ?? 0,
+      serviceSpecialId: promo.serviceSpecialId ?? undefined,
+      minVisits: promo.minVisits,
+      maxUses: promo.maxUses ?? undefined,
+      startDate: promo.startDate,
+      endDate: promo.endDate,
+      stationId: promo.stationId ?? undefined,
+      washTypeIds: promo.washTypes?.map((w) => w.id) ?? [],
+    })
+    setShowPromoModal(true)
+  }
+
+  const closePromoModal = () => {
+    setShowPromoModal(false)
+    setEditingPromo(null)
+  }
+
+  const handleSavePromo = async () => {
+    if (!promoForm.nom.trim()) { toast.error('Le nom est requis'); return }
+    if (!promoForm.startDate || !promoForm.endDate) { toast.error('Les dates sont requises'); return }
+    if (promoForm.washTypeIds.length === 0) { toast.error('Sélectionnez au moins un type de lavage'); return }
+    try {
+      if (editingPromo) {
+        await updatePromotion.mutateAsync({ id: editingPromo.id, data: promoForm })
+        toast.success('Promotion mise à jour')
+      } else {
+        await createPromotion.mutateAsync(promoForm)
+        toast.success('Promotion créée')
+      }
+      closePromoModal()
+    } catch {
+      toast.error('Erreur lors de la sauvegarde')
+    }
+  }
+
+  const handleTogglePromo = async (id: number) => {
+    try {
+      await togglePromotion.mutateAsync(id)
+    } catch {
+      toast.error('Erreur lors du basculement')
+    }
+  }
+
+  const toggleWashTypeId = (id: number) => {
+    setPromoForm((f) => ({
+      ...f,
+      washTypeIds: f.washTypeIds.includes(id)
+        ? f.washTypeIds.filter((wid) => wid !== id)
+        : [...f.washTypeIds, id],
+    }))
+  }
+
   const resolvedMessage = useMemo(() => {
     if (campaignMessageMode === 'template' && newCampaign.templateId) {
       return templates?.find((t) => t.id === newCampaign.templateId)?.contenu ?? ''
@@ -349,6 +449,7 @@ export default function Marketing() {
     { key: 'clients', label: 'Clients', icon: Users },
     { key: 'campaigns', label: 'Campagnes SMS', icon: MessageSquare },
     { key: 'templates', label: 'Templates', icon: FileText },
+    { key: 'promotions', label: 'Promotions', icon: Zap },
   ]
 
   /* ─── Render ───── */
@@ -1089,6 +1190,429 @@ export default function Marketing() {
           )}
         </motion.div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* TAB 4 — PROMOTIONS                                            */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {activeTab === 'promotions' && (
+        <motion.div key="promotions" variants={stagger} initial="hidden" animate="show" className="space-y-5">
+          {/* Header */}
+          <motion.div variants={rise} className="flex items-center justify-between">
+            <h2 className="font-heading font-semibold text-ink text-lg flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" />
+              Promotions
+            </h2>
+            <button
+              onClick={openNewPromo}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/25 hover:shadow-amber-500/35 transition-shadow text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Nouvelle Promotion
+            </button>
+          </motion.div>
+
+          {/* Promotion cards */}
+          {promotionsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-panel border border-edge rounded-2xl p-5 animate-pulse">
+                  <div className="h-4 w-32 bg-raised rounded mb-3" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-full bg-raised rounded" />
+                    <div className="h-3 w-3/4 bg-raised rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !promotions?.length ? (
+            <motion.div variants={rise} className="bg-panel border border-edge rounded-2xl p-12 text-center">
+              <Zap className="w-10 h-10 mx-auto mb-3 opacity-20 text-ink-muted" />
+              <p className="text-sm text-ink-muted">Aucune promotion cr&eacute;&eacute;e</p>
+              <p className="text-xs text-ink-muted mt-1">Cr&eacute;ez des promotions pour fid&eacute;liser vos clients et booster les lavages</p>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {promotions.map((promo) => {
+                const isDiscount = promo.type === 'discount'
+                const today = new Date().toISOString().slice(0, 10)
+                const isExpired = promo.endDate < today
+                const isUpcoming = promo.startDate > today
+                const isExhausted = promo.maxUses !== null && promo.maxUses !== undefined && promo.usedCount >= promo.maxUses
+
+                return (
+                  <motion.div
+                    key={promo.id}
+                    variants={rise}
+                    className={`bg-panel border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group ${
+                      !promo.isActive || isExpired || isExhausted ? 'opacity-60 border-edge' : 'border-edge'
+                    }`}
+                  >
+                    {/* Top row: type badge + toggle */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-2 rounded-xl ${isDiscount ? 'bg-teal-500/10' : 'bg-purple-500/10'}`}>
+                          {isDiscount ? (
+                            <Percent className="w-3.5 h-3.5 text-teal-600" />
+                          ) : (
+                            <Gift className="w-3.5 h-3.5 text-purple-600" />
+                          )}
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold ${
+                          isDiscount
+                            ? 'bg-teal-500/10 text-teal-600'
+                            : 'bg-purple-500/10 text-purple-600'
+                        }`}>
+                          {isDiscount ? 'Remise' : 'Service Offert'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditPromo(promo)}
+                          className="p-1.5 rounded-lg hover:bg-raised text-ink-muted hover:text-ink transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleTogglePromo(promo.id)}
+                          className="p-1 rounded-lg hover:bg-raised transition-colors"
+                          title={promo.isActive ? 'Désactiver' : 'Activer'}
+                        >
+                          {promo.isActive ? (
+                            <ToggleRight className="w-5 h-5 text-emerald-500" />
+                          ) : (
+                            <ToggleLeft className="w-5 h-5 text-ink-muted" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Title + description */}
+                    <h3 className="font-semibold text-ink text-sm mb-1">{promo.nom}</h3>
+                    {promo.description && (
+                      <p className="text-[11px] text-ink-muted line-clamp-2 mb-3">{promo.description}</p>
+                    )}
+
+                    {/* Discount details */}
+                    <div className="bg-inset border border-edge rounded-xl p-2.5 mb-3">
+                      {isDiscount ? (
+                        <p className="text-sm font-bold text-ink">
+                          {promo.discountType === 'percentage'
+                            ? `${promo.discountValue}% de remise`
+                            : `${Number(promo.discountValue).toLocaleString('fr-FR')} FCFA de remise`}
+                        </p>
+                      ) : (
+                        <p className="text-sm font-bold text-ink">
+                          {promo.serviceSpecial?.nom ?? 'Service'} offert
+                          {promo.serviceSpecial?.prix ? ` (${Number(promo.serviceSpecial.prix).toLocaleString('fr-FR')} FCFA)` : ''}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Wash type pills */}
+                    {promo.washTypes && promo.washTypes.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {promo.washTypes.map((wt) => (
+                          <span key={wt.id} className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                            {wt.nom}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Info row */}
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink-muted mb-2">
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        {promo.minVisits > 0 ? `${promo.minVisits}+ visites` : 'Tous clients'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        {promo.usedCount}/{promo.maxUses ?? '∞'}
+                      </span>
+                    </div>
+
+                    {/* Date range + station */}
+                    <div className="flex items-center justify-between text-[10px] text-ink-muted pt-2 border-t border-edge">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(promo.startDate).toLocaleDateString('fr-FR')} — {new Date(promo.endDate).toLocaleDateString('fr-FR')}
+                      </span>
+                      <span>
+                        {promo.station ? promo.station.nom : 'Toutes stations'}
+                      </span>
+                    </div>
+
+                    {/* Status indicator */}
+                    {(isExpired || isUpcoming || isExhausted) && (
+                      <div className={`mt-2 px-2 py-1 rounded-lg text-[10px] font-semibold text-center ${
+                        isExpired ? 'bg-red-500/10 text-red-600' :
+                        isExhausted ? 'bg-orange-500/10 text-orange-600' :
+                        'bg-blue-500/10 text-blue-600'
+                      }`}>
+                        {isExpired ? 'Expirée' : isExhausted ? 'Limite atteinte' : 'À venir'}
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL — Promotion (Create / Edit)                             */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {showPromoModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={closePromoModal}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-panel border border-edge rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+            >
+              <div className="px-6 py-4 border-b border-edge flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500/10">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <h3 className="font-heading font-semibold text-ink text-base">
+                    {editingPromo ? 'Modifier la promotion' : 'Nouvelle promotion'}
+                  </h3>
+                </div>
+                <button onClick={closePromoModal} className="p-1.5 rounded-lg hover:bg-raised text-ink-muted hover:text-ink transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-4">
+                {/* Nom */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">Nom *</label>
+                  <input
+                    value={promoForm.nom}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, nom: e.target.value }))}
+                    placeholder="Ex: -10% Lavage Complet"
+                    className="w-full px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink placeholder-ink-muted outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">Description</label>
+                  <input
+                    value={promoForm.description ?? ''}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, description: e.target.value || undefined }))}
+                    placeholder="Description optionnelle..."
+                    className="w-full px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink placeholder-ink-muted outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                  />
+                </div>
+
+                {/* Type */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">Type *</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPromoForm((f) => ({ ...f, type: 'discount', serviceSpecialId: undefined }))}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                        promoForm.type === 'discount'
+                          ? 'bg-teal-500/10 text-teal-600 border border-teal-500/30'
+                          : 'bg-inset border border-edge text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      <Percent className="w-3.5 h-3.5" /> Remise
+                    </button>
+                    <button
+                      onClick={() => setPromoForm((f) => ({ ...f, type: 'service_offert', discountType: undefined, discountValue: undefined }))}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                        promoForm.type === 'service_offert'
+                          ? 'bg-purple-500/10 text-purple-600 border border-purple-500/30'
+                          : 'bg-inset border border-edge text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      <Gift className="w-3.5 h-3.5" /> Service Offert
+                    </button>
+                  </div>
+                </div>
+
+                {/* Discount fields */}
+                {promoForm.type === 'discount' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-ink mb-1.5">Type de remise</label>
+                      <div className="relative">
+                        <select
+                          value={promoForm.discountType || 'percentage'}
+                          onChange={(e) => setPromoForm((f) => ({ ...f, discountType: e.target.value as 'percentage' | 'fixed' }))}
+                          className="w-full appearance-none px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none focus:border-amber-500 cursor-pointer"
+                        >
+                          <option value="percentage">Pourcentage</option>
+                          <option value="fixed">Montant fixe</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-ink mb-1.5">
+                        Valeur {promoForm.discountType === 'percentage' ? '(%)' : '(FCFA)'}
+                      </label>
+                      <input
+                        type="number"
+                        value={promoForm.discountValue ?? ''}
+                        onChange={(e) => setPromoForm((f) => ({ ...f, discountValue: Number(e.target.value) }))}
+                        min={0}
+                        className="w-full px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Service offert field */}
+                {promoForm.type === 'service_offert' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">Service &agrave; offrir *</label>
+                    <div className="relative">
+                      <select
+                        value={promoForm.serviceSpecialId ?? ''}
+                        onChange={(e) => setPromoForm((f) => ({ ...f, serviceSpecialId: Number(e.target.value) || undefined }))}
+                        className="w-full appearance-none px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none focus:border-amber-500 cursor-pointer"
+                      >
+                        <option value="">Sélectionner un service...</option>
+                        {(extras ?? []).map((extra) => (
+                          <option key={extra.id} value={extra.id}>
+                            {extra.nom} ({Number(extra.prix).toLocaleString('fr-FR')} FCFA)
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Wash types */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">Types de lavage concern&eacute;s *</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(washTypes ?? []).map((wt) => {
+                      const selected = promoForm.washTypeIds.includes(wt.id)
+                      return (
+                        <button
+                          key={wt.id}
+                          onClick={() => toggleWashTypeId(wt.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
+                            selected
+                              ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                              : 'bg-inset text-ink-muted border-edge hover:text-ink hover:border-amber-500/20'
+                          }`}
+                        >
+                          {wt.nom}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {washTypes && washTypes.length === 0 && (
+                    <p className="text-[10px] text-ink-muted mt-1">Aucun type de lavage disponible</p>
+                  )}
+                </div>
+
+                {/* Min visits + Max uses */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">Visites minimum</label>
+                    <input
+                      type="number"
+                      value={promoForm.minVisits ?? 0}
+                      onChange={(e) => setPromoForm((f) => ({ ...f, minVisits: Number(e.target.value) }))}
+                      min={0}
+                      className="w-full px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    />
+                    <p className="text-[10px] text-ink-muted mt-1">0 = tous les clients</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">Utilisations max</label>
+                    <input
+                      type="number"
+                      value={promoForm.maxUses ?? ''}
+                      onChange={(e) => setPromoForm((f) => ({ ...f, maxUses: e.target.value ? Number(e.target.value) : undefined }))}
+                      min={1}
+                      placeholder="Illimité"
+                      className="w-full px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink placeholder-ink-muted outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    />
+                  </div>
+                </div>
+
+                {/* Date range */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">Date de d&eacute;but *</label>
+                    <input
+                      type="date"
+                      value={promoForm.startDate}
+                      onChange={(e) => setPromoForm((f) => ({ ...f, startDate: e.target.value }))}
+                      className="w-full px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-ink mb-1.5">Date de fin *</label>
+                    <input
+                      type="date"
+                      value={promoForm.endDate}
+                      onChange={(e) => setPromoForm((f) => ({ ...f, endDate: e.target.value }))}
+                      className="w-full px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
+                    />
+                  </div>
+                </div>
+
+                {/* Station scope */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">Station</label>
+                  <div className="relative">
+                    <select
+                      value={promoForm.stationId ?? ''}
+                      onChange={(e) => setPromoForm((f) => ({ ...f, stationId: e.target.value ? Number(e.target.value) : undefined }))}
+                      className="w-full appearance-none px-3 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="">Toutes les stations</option>
+                      {(stations ?? []).map((st) => (
+                        <option key={st.id} value={st.id}>{st.nom}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-edge flex justify-end gap-2">
+                <button
+                  onClick={closePromoModal}
+                  className="px-4 py-2.5 text-sm font-medium text-ink-muted hover:text-ink transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleSavePromo}
+                  disabled={createPromotion.isPending || updatePromotion.isPending}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/25 text-sm disabled:opacity-50 hover:shadow-amber-500/35 transition-shadow"
+                >
+                  {(createPromotion.isPending || updatePromotion.isPending) && (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+                  {editingPromo ? 'Mettre à jour' : 'Créer'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* MODAL — Export CSV                                            */}
