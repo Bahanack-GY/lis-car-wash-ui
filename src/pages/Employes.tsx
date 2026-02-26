@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { UserCog, Search, Plus, Phone, Mail, Award, Car, Shield, Filter, ChevronRight, Star, X, MapPin } from 'lucide-react'
+import { UserCog, Search, Plus, Phone, Mail, Award, Car, Shield, Filter, ChevronRight, Star, X, MapPin, Target, Coins } from 'lucide-react'
 import { useUsers, useCreateUser, useAssignStation } from '@/api/users'
 import { useStations } from '@/api/stations'
 import type { CreateUserDto } from '@/api/users/types'
@@ -84,7 +84,7 @@ export default function Employes() {
 
       toast.success(`${formData.prenom} ${formData.nom} ajouté avec succès !`)
       setIsModalOpen(false)
-      setFormData({ nom: '', prenom: '', email: '', telephone: '', password: '', role: 'laveur' })
+      setFormData({ nom: '', prenom: '', email: '', telephone: '', password: '', role: 'laveur', bonusParLavage: undefined, objectifJournalier: undefined })
       setSelectedStationId('')
     } catch {
       // error displayed by axios interceptor
@@ -326,7 +326,7 @@ export default function Employes() {
                     <label className="block text-sm font-medium text-ink-light mb-1.5">Rôle *</label>
                     <select
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as any, bonusParLavage: undefined, objectifJournalier: undefined })}
                       className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                     >
                       <option value="laveur">Laveur</option>
@@ -359,6 +359,41 @@ export default function Employes() {
                     <p className="text-xs text-warn mt-1">Un manager doit être assigné à une station</p>
                   )}
                 </div>
+
+                {/* Role-specific fields */}
+                {formData.role === 'laveur' && (
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-ink-light mb-1.5">
+                      <Coins className="w-3.5 h-3.5" /> Bonus par lavage (FCFA)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.bonusParLavage ?? ''}
+                      onChange={(e) => setFormData({ ...formData, bonusParLavage: e.target.value ? Number(e.target.value) : undefined })}
+                      className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                      placeholder="Ex: 500"
+                    />
+                    <p className="text-xs text-ink-muted mt-1">Montant du bonus attribué pour chaque lavage effectué</p>
+                  </div>
+                )}
+
+                {formData.role === 'commercial' && (
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-ink-light mb-1.5">
+                      <Target className="w-3.5 h-3.5" /> Objectif journalier
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.objectifJournalier ?? ''}
+                      onChange={(e) => setFormData({ ...formData, objectifJournalier: e.target.value ? Number(e.target.value) : undefined })}
+                      className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                      placeholder="Ex: 10"
+                    />
+                    <p className="text-xs text-ink-muted mt-1">Nombre de véhicules à enregistrer par jour</p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-ink-light mb-1.5">Mot de passe provisoire *</label>

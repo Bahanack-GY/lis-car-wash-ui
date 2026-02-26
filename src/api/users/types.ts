@@ -47,6 +47,8 @@ export interface User {
     telephone?: string;
     role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial';
     actif: boolean;
+    bonusParLavage?: number | null;
+    objectifJournalier?: number | null;
     affectations?: Affectation[];
     sanctions?: Sanction[];
     promotions?: Promotion[];
@@ -69,6 +71,8 @@ export interface CreateUserDto {
     telephone?: string;
     password?: string;
     role: 'super_admin' | 'manager' | 'controleur' | 'caissiere' | 'laveur' | 'commercial';
+    bonusParLavage?: number;
+    objectifJournalier?: number;
 }
 
 export interface UpdateUserDto extends Partial<Omit<CreateUserDto, 'role'>> { }

@@ -33,6 +33,7 @@ const allNavItems: NavItem[] = [
   { path: '/types-lavage',  label: 'Types de Lavage',   icon: Droplets,        roles: ['super_admin', 'manager'] },
   { path: '/services-additionnels', label: 'Services Add.', icon: Sparkles,    roles: ['super_admin', 'manager'] },
   { path: '/employes',      label: 'Employés',          icon: UserCog,         roles: ['super_admin', 'manager'] },
+  { path: '/marketing',     label: 'Marketing',         icon: Megaphone,       roles: ['super_admin', 'manager'] },
   { path: '/stations',      label: 'Stations',          icon: Building2,       roles: ['super_admin'] },
   { path: '/mon-espace',    label: 'Mon Espace',        icon: Star,            roles: ['laveur'] },
   { path: '/espace-commercial', label: 'Espace Commercial', icon: Megaphone,     roles: ['commercial'] },

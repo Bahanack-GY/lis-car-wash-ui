@@ -151,7 +151,7 @@ export default function EmployeDetail() {
 
   // Edit state
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState({ nom: '', prenom: '', email: '', telephone: '' })
+  const [editData, setEditData] = useState({ nom: '', prenom: '', email: '', telephone: '', bonusParLavage: '' as string, objectifJournalier: '' as string })
 
   // Transfer state
   const [transferStationId, setTransferStationId] = useState<number | ''>('')
@@ -291,6 +291,8 @@ export default function EmployeDetail() {
       prenom: user.prenom,
       email: user.email,
       telephone: user.telephone || '',
+      bonusParLavage: user.bonusParLavage != null ? String(user.bonusParLavage) : '',
+      objectifJournalier: user.objectifJournalier != null ? String(user.objectifJournalier) : '',
     })
     setIsEditing(true)
   }
@@ -302,15 +304,19 @@ export default function EmployeDetail() {
   const handleSave = async () => {
     if (!user) return
     try {
-      await updateUser.mutateAsync({
-        id: user.id,
-        data: {
-          nom: editData.nom,
-          prenom: editData.prenom,
-          email: editData.email,
-          telephone: editData.telephone || undefined,
-        },
-      })
+      const payload: Record<string, any> = {
+        nom: editData.nom,
+        prenom: editData.prenom,
+        email: editData.email,
+        telephone: editData.telephone || undefined,
+      }
+      if (user.role === 'laveur') {
+        payload.bonusParLavage = editData.bonusParLavage ? Number(editData.bonusParLavage) : undefined
+      }
+      if (user.role === 'commercial') {
+        payload.objectifJournalier = editData.objectifJournalier ? Number(editData.objectifJournalier) : undefined
+      }
+      await updateUser.mutateAsync({ id: user.id, data: payload })
       toast.success('Employé mis à jour avec succès')
       setIsEditing(false)
     } catch {
@@ -852,6 +858,36 @@ export default function EmployeDetail() {
                 className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
               />
             </div>
+            {user.role === 'laveur' && (
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-ink-light mb-1.5">
+                  <Banknote className="w-3.5 h-3.5" /> Bonus par lavage (FCFA)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editData.bonusParLavage}
+                  onChange={(e) => setEditData({ ...editData, bonusParLavage: e.target.value })}
+                  className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                  placeholder="Ex: 500"
+                />
+              </div>
+            )}
+            {user.role === 'commercial' && (
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-ink-light mb-1.5">
+                  <Target className="w-3.5 h-3.5" /> Objectif journalier
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editData.objectifJournalier}
+                  onChange={(e) => setEditData({ ...editData, objectifJournalier: e.target.value })}
+                  className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
+                  placeholder="Ex: 10"
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -861,6 +897,8 @@ export default function EmployeDetail() {
               { label: 'Email', value: user.email },
               { label: 'Téléphone', value: user.telephone || '—' },
               { label: 'Rôle', value: role.label },
+              ...(user.role === 'laveur' ? [{ label: 'Bonus par lavage', value: user.bonusParLavage != null ? `${Number(user.bonusParLavage).toLocaleString()} FCFA` : 'Non défini' }] : []),
+              ...(user.role === 'commercial' ? [{ label: 'Objectif journalier', value: user.objectifJournalier != null ? `${user.objectifJournalier} véhicules/jour` : 'Non défini' }] : []),
             ].map(f => (
               <div key={f.label} className="p-3 bg-inset rounded-xl border border-divider">
                 <p className="text-xs text-ink-muted mb-0.5">{f.label}</p>

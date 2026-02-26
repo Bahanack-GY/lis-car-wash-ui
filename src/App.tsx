@@ -24,6 +24,7 @@ import GlobalDashboard from '@/pages/GlobalDashboard'
 import MonEspace from '@/pages/MonEspace'
 import Commercial from '@/pages/Commercial'
 import CommercialAnalytics from '@/pages/CommercialAnalytics'
+import Marketing from '@/pages/Marketing'
 import Unauthorized from '@/pages/Unauthorized'
 
 export default function App() {
@@ -151,6 +152,12 @@ export default function App() {
           <Route path="/commercial-analytics" element={
             <ProtectedRoute roles={['commercial']}>
               <CommercialAnalytics />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/marketing" element={
+            <ProtectedRoute roles={['super_admin', 'manager']}>
+              <Marketing />
             </ProtectedRoute>
           } />
         </Route>

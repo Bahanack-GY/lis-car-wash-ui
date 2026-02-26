@@ -183,8 +183,8 @@ export default function NouveauLavage() {
   const selectedExtras = availableExtras.filter((e) => selectedExtrasIds.includes(e.id))
   
   const total = useMemo(() => {
-    let s = wash?.prixBase ?? 0
-    selectedExtras.forEach((e) => (s += (e.prix || 0)))
+    let s = Number(wash?.prixBase) || 0
+    selectedExtras.forEach((e) => (s += Number(e.prix) || 0))
     return s
   }, [wash, selectedExtras])
 
