@@ -25,6 +25,11 @@ import MonEspace from '@/pages/MonEspace'
 import Commercial from '@/pages/Commercial'
 import CommercialAnalytics from '@/pages/CommercialAnalytics'
 import Marketing from '@/pages/Marketing'
+import AuditLogs from '@/pages/AuditLogs'
+import AdminLayout from '@/components/AdminLayout'
+import AdminEmployees from '@/pages/admin/AdminEmployees'
+import AdminClients from '@/pages/admin/AdminClients'
+import AdminIncidents from '@/pages/admin/AdminIncidents'
 import Unauthorized from '@/pages/Unauthorized'
 
 export default function App() {
@@ -35,7 +40,14 @@ export default function App() {
         {/* Public */}
         <Route path="/" element={<Login />} />
         <Route path="/select-station" element={<SelectStation />} />
-        <Route path="/global-dashboard" element={<GlobalDashboard />} />
+        <Route path="/global-dashboard" element={<AdminLayout />}>
+          <Route index element={<GlobalDashboard />} />
+          <Route path="employees" element={<AdminEmployees />} />
+          <Route path="clients" element={<AdminClients />} />
+          <Route path="incidents" element={<AdminIncidents />} />
+          <Route path="stations" element={<Stations />} />
+          <Route path="audit" element={<AuditLogs />} />
+        </Route>
 
         {/* Protected — inside Layout */}
         <Route element={<Layout />}>
@@ -158,6 +170,12 @@ export default function App() {
           <Route path="/marketing" element={
             <ProtectedRoute roles={['super_admin', 'manager']}>
               <Marketing />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/audit-logs" element={
+            <ProtectedRoute roles={['super_admin']}>
+              <AuditLogs />
             </ProtectedRoute>
           } />
         </Route>

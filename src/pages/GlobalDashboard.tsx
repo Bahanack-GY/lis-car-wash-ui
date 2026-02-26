@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Wallet,
@@ -8,10 +7,6 @@ import {
   CalendarCheck,
   Building2,
   AlertTriangle,
-  ArrowLeft,
-  Sun,
-  Moon,
-  LogOut,
   Trophy,
   Loader2,
   MoreHorizontal,
@@ -33,9 +28,6 @@ import {
   Legend,
 } from 'recharts'
 
-import Logo from '@/assets/Logo.png'
-import { useTheme } from '@/contexts/ThemeContext'
-import { useAuth } from '@/contexts/AuthContext'
 import {
   useGlobalStats,
   useGlobalRevenueByStation,
@@ -124,10 +116,6 @@ const periodUnitLabels: Record<DatePeriod, string> = {
 }
 
 export default function GlobalDashboard() {
-  const navigate = useNavigate()
-  const { isDark, toggle } = useTheme()
-  const { user, logout } = useAuth()
-
   // Period state
   const [period, setPeriod] = useState<DatePeriod>('today')
   const [customStart, setCustomStart] = useState('')
@@ -205,22 +193,9 @@ export default function GlobalDashboard() {
     { label: 'Incidents actifs', value: stats?.incidentCount?.toString() || '0', unit: 'non résolus', icon: AlertTriangle, accent: 'bg-red-500/10 text-bad' },
   ]
 
-  const roleLabel: Record<string, string> = {
-    super_admin: 'Super Administrateur',
-    manager: 'Manager',
-    controleur: 'Contrôleur',
-    caissiere: 'Caissière',
-    laveur: 'Laveur',
-  }
-
-  const handleLogout = () => {
-    logout()
-    navigate('/')
-  }
-
   if (isFirstLoad) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center space-y-4">
+      <div className="flex items-center justify-center py-24 space-x-3">
         <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
         <p className="text-sm text-ink-muted">Chargement du tableau de bord global...</p>
       </div>
@@ -228,54 +203,7 @@ export default function GlobalDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 sm:px-10 py-5">
-        <div className="flex items-center gap-3">
-          <img src={Logo} alt="LIS" className="w-9 h-9 rounded-lg object-contain" />
-          <div>
-            <h1 className="font-heading font-bold text-sm text-ink leading-tight">LIS Car Wash</h1>
-            <p className="text-[11px] text-ink-muted leading-tight">Tableau de bord global</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {user && (
-            <div className="hidden sm:flex items-center gap-2 text-sm text-ink-muted">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold text-[10px]">
-                {user.prenom[0]}{user.nom[0]}
-              </div>
-              <span className="font-medium text-ink">{user.prenom} {user.nom}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-accent-wash text-accent font-medium">
-                {roleLabel[user.role] ?? user.role}
-              </span>
-            </div>
-          )}
-          <button
-            onClick={() => navigate('/select-station')}
-            className="flex items-center gap-2 text-sm text-ink-muted hover:text-ink transition-colors px-3 py-2 rounded-xl hover:bg-raised"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Stations</span>
-          </button>
-          <button
-            onClick={toggle}
-            className="text-ink-muted hover:text-ink p-2 rounded-xl hover:bg-raised transition-colors"
-          >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-ink-muted hover:text-bad transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Déconnexion</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <div className="flex-1 px-6 sm:px-10 pb-16">
-        <div className="max-w-7xl mx-auto">
+    <div>
           <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
             {/* Title + Period selector */}
             <motion.div variants={rise} className="pt-2 space-y-4">
@@ -557,8 +485,6 @@ export default function GlobalDashboard() {
               </motion.div>
             </div>
           </motion.div>
-        </div>
-      </div>
     </div>
   )
 }
