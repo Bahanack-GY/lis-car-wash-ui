@@ -5,11 +5,12 @@ import {
   LayoutDashboard, CalendarDays, ClipboardList, Ticket, CreditCard,
   Users, Package, UserCog, Building2, Search, Bell, LogOut,
   ChevronLeft, Menu, Plus, Sun, Moon, Star, Droplets, Sparkles, MapPin, Check, ChevronsUpDown, Clock, AlertTriangle,
-  Megaphone, BarChart3, ScrollText, Ban, Info, ShieldAlert, Zap, AlertCircle, CheckCircle2, X, Gift,
+  Megaphone, BarChart3, ScrollText, Ban, Info, ShieldAlert, Zap, AlertCircle, CheckCircle2, Gift,
 } from 'lucide-react'
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth, type UserRole } from '@/contexts/AuthContext'
+import ChatWidget from '@/components/ChatWidget'
 import { useStations } from '@/api/stations'
 import { useActiveIncidentsByStation, useIncidents, useUpdateIncident } from '@/api/incidents'
 import type { Incident, IncidentSeverity } from '@/api/incidents'
@@ -584,6 +585,9 @@ export default function Layout() {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* AI Chatbot — restricted to decision-maker roles */}
+      {hasRole('super_admin', 'manager', 'comptable') && <ChatWidget />}
     </div>
   )
 }

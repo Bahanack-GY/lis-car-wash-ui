@@ -8,7 +8,6 @@ import type {
     MarketingClientFilters,
     SmsTemplate,
     CreateTemplateDto,
-    Campaign,
     CampaignDetail,
     PaginatedCampaigns,
     CreateCampaignDto,

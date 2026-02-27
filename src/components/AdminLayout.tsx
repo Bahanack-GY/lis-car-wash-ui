@@ -8,6 +8,7 @@ import {
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth, type UserRole } from '@/contexts/AuthContext'
+import ChatWidget from '@/components/ChatWidget'
 
 interface NavItem {
   path: string
@@ -252,6 +253,8 @@ export default function AdminLayout() {
           </AnimatePresence>
         </main>
       </div>
+
+      <ChatWidget />
     </div>
   )
 }

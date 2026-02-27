@@ -90,7 +90,7 @@ const stagger = {
 }
 const rise = {
   hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45 } },
 }
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
@@ -156,7 +156,7 @@ export default function Marketing() {
   const [exportSearch, setExportSearch] = useState('')
   const [exportSortBy, setExportSortBy] = useState<MarketingClientFilters['sortBy']>('lastVisit')
   const [exportSortOrder, setExportSortOrder] = useState<MarketingClientFilters['sortOrder']>('DESC')
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     clearTimeout(debounceRef.current)

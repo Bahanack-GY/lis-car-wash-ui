@@ -592,9 +592,9 @@ export default function EmployeDetail() {
                   <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
                   <RechartsTooltip
                     contentStyle={tooltipStyle}
-                    formatter={(v: number, name: string) => {
-                      if (name === 'vehicules') return [`${v} véhicule${v > 1 ? 's' : ''}`, 'Lavés']
-                      return [v, name]
+                    formatter={(v: number | undefined, name: string | undefined) => {
+                      if (name === 'vehicules') return [`${v ?? 0} véhicule${(v ?? 0) > 1 ? 's' : ''}`, 'Lavés']
+                      return [v ?? 0, name ?? '']
                     }}
                   />
                   <Bar dataKey="vehicules" fill="#33cbcc" radius={[6, 6, 0, 0]} maxBarSize={40} />
@@ -622,7 +622,7 @@ export default function EmployeDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
                   <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => v >= 1000 ? `${v / 1000}k` : String(v)} />
-                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${(v ?? 0).toLocaleString()} FCFA`, 'Bonus']} />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number | undefined) => [`${(v ?? 0).toLocaleString()} FCFA`, 'Bonus']} />
                   <Area type="monotone" dataKey="bonus" stroke="#10b981" strokeWidth={2.5} fill="url(#gBonus)" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -645,7 +645,7 @@ export default function EmployeDetail() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v} jour${v > 1 ? 's' : ''}`, 'Travaillés']} />
+                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number | undefined) => [`${v ?? 0} jour${(v ?? 0) > 1 ? 's' : ''}`, 'Travaillés']} />
                 <Bar dataKey="jours" fill="#283852" radius={[6, 6, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
@@ -675,7 +675,7 @@ export default function EmployeDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
                   <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${(v ?? 0).toLocaleString()} FCFA`, 'Encaissé']} />
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number | undefined) => [`${(v ?? 0).toLocaleString()} FCFA`, 'Encaissé']} />
                   <Area type="monotone" dataKey="montant" stroke="#10b981" strokeWidth={2.5} fill="url(#gCaisse)" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -695,8 +695,8 @@ export default function EmployeDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" horizontal={false} />
                   <XAxis type="number" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
                   <YAxis type="category" dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} width={100} />
-                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => {
-                    if (name === 'transactions') return [`${v} transaction${v > 1 ? 's' : ''}`, 'Nombre']
+                  <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number | undefined, name: string | undefined) => {
+                    if (name === 'transactions') return [`${v ?? 0} transaction${(v ?? 0) > 1 ? 's' : ''}`, 'Nombre']
                     return [`${(v ?? 0).toLocaleString()} FCFA`, 'Montant']
                   }} />
                   <Bar dataKey="transactions" fill="#33cbcc" radius={[0, 6, 6, 0]} maxBarSize={28} />
@@ -722,7 +722,7 @@ export default function EmployeDetail() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--c-edge)" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v} fiche${v > 1 ? 's' : ''}`, 'Inspectées']} />
+                <RechartsTooltip contentStyle={tooltipStyle} formatter={(v: number | undefined) => [`${v ?? 0} fiche${(v ?? 0) > 1 ? 's' : ''}`, 'Inspectées']} />
                 <Bar dataKey="fiches" fill="#33cbcc" radius={[6, 6, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>

@@ -375,7 +375,7 @@ export default function GlobalDashboard() {
                     <YAxis stroke="var(--c-ink-muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: number) => v >= 1000 ? `${v / 1000}k` : `${v}`} />
                     <RechartsTooltip
                       contentStyle={tooltipStyle}
-                      formatter={(v: number | undefined, name: string) => [`${(v ?? 0).toLocaleString()} FCFA`, name]}
+                      formatter={(v: number | undefined, name: string | undefined) => [`${(v ?? 0).toLocaleString()} FCFA`, name ?? '']}
                     />
                     <Legend />
                     {revenueByStation.map((station, i) => (

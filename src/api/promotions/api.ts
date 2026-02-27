@@ -2,7 +2,7 @@ import { apiClient } from '@/lib/axios'
 import type { Promotion, CreatePromotionDto, UpdatePromotionDto, ApplicablePromotion } from './types'
 
 export const promotionsApi = {
-    findAll: async (stationId?: number, isActive?: boolean): Promise<Promotion[]> => {
+    findAll: async (_stationId?: number, isActive?: boolean): Promise<Promotion[]> => {
         const params: Record<string, any> = {}
         if (isActive !== undefined) params.isActive = isActive
         const response = await apiClient.get<Promotion[]>('/marketing/promotions', { params })

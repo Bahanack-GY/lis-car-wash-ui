@@ -98,8 +98,6 @@ export default function Caisse() {
   const totalTransactions = paiementsData?.total || 0
 
   const totalRecettes = Number(summaryData?.totalRecettes) || 0
-  const totalDepenses = Number(summaryData?.totalDepenses) || 0
-
   // Break down by method from the transactions list
   let totalCash = 0, totalMobile = 0, totalCard = 0
   paiementsList.forEach(p => {
