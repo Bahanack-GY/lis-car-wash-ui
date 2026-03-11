@@ -53,4 +53,11 @@ export const clientsApi = {
         });
         return response.data;
     },
+
+    exportAll: async (filters?: Omit<ClientFilters, 'page' | 'limit'>): Promise<Client[]> => {
+        const response = await apiClient.get<PaginatedClients>('/clients', {
+            params: { ...filters, page: 1, limit: 99999 },
+        });
+        return response.data.data;
+    },
 };

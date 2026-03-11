@@ -4,9 +4,11 @@ export interface Client {
     nom: string;
     contact?: string;
     email?: string;
+    quartier?: string;
     pointsFidelite?: number;
     vehicleCount?: number;
     activeSubscriptionCount?: number;
+    vehicleTypes?: string;
     vehicles?: Vehicle[];
     subscriptions?: Subscription[];
     createdAt: string;
@@ -25,6 +27,7 @@ export interface CreateClientDto {
     nom: string;
     contact?: string;
     email?: string;
+    quartier?: string;
     stationId?: number;
 }
 
@@ -71,4 +74,9 @@ export interface ClientFilters {
     stationId?: number;
     page?: number;
     limit?: number;
+    vehicleType?: string;
+    contact?: string;
+    quartier?: string;
+    dateFrom?: string;
+    dateTo?: string;
 }

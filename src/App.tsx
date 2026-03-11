@@ -32,6 +32,7 @@ import AdminLayout from '@/components/AdminLayout'
 import AdminEmployees from '@/pages/admin/AdminEmployees'
 import AdminClients from '@/pages/admin/AdminClients'
 import AdminIncidents from '@/pages/admin/AdminIncidents'
+import Classement from '@/pages/Classement'
 import Unauthorized from '@/pages/Unauthorized'
 
 export default function App() {
@@ -160,6 +161,12 @@ export default function App() {
           <Route path="/mon-espace" element={
             <ProtectedRoute roles={['laveur']}>
               <MonEspace />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/classement" element={
+            <ProtectedRoute roles={['laveur', 'commercial', 'controleur', 'super_admin', 'manager']}>
+              <Classement />
             </ProtectedRoute>
           } />
 

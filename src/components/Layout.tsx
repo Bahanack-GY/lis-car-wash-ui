@@ -5,9 +5,10 @@ import {
   LayoutDashboard, CalendarDays, ClipboardList, Ticket, CreditCard,
   Users, Package, UserCog, Building2, Search, Bell, LogOut,
   ChevronLeft, Menu, Plus, Sun, Moon, Star, Droplets, Sparkles, MapPin, Check, ChevronsUpDown, Clock, AlertTriangle,
-  Megaphone, BarChart3, ScrollText, Ban, Info, ShieldAlert, Zap, AlertCircle, CheckCircle2, Gift,
+  Megaphone, BarChart3, ScrollText, Ban, Info, ShieldAlert, Zap, AlertCircle, CheckCircle2, Gift, Trophy,
 } from 'lucide-react'
 import Logo from '@/assets/Logo.png'
+import TrophyManager from '@/components/TrophyManager'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth, type UserRole } from '@/contexts/AuthContext'
 import ChatWidget from '@/components/ChatWidget'
@@ -44,6 +45,7 @@ const allNavItems: NavItem[] = [
   { path: '/mon-espace',    label: 'Mon Espace',        icon: Star,            roles: ['laveur'] },
   { path: '/espace-commercial', label: 'Espace Commercial', icon: Megaphone,     roles: ['commercial'] },
   { path: '/commercial-analytics', label: 'Mes Statistiques', icon: BarChart3,   roles: ['commercial'] },
+  { path: '/classement',    label: 'Classement',         icon: Trophy,          roles: ['laveur', 'commercial', 'controleur', 'super_admin', 'manager'] },
 ]
 
 const roleLabel: Record<UserRole, string> = {
@@ -588,6 +590,9 @@ export default function Layout() {
 
       {/* AI Chatbot — restricted to decision-maker roles */}
       {hasRole('super_admin', 'manager', 'comptable') && <ChatWidget />}
+
+      {/* Trophy unlock popup — laveurs & commerciaux */}
+      <TrophyManager />
     </div>
   )
 }

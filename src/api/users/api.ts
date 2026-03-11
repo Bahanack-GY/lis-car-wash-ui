@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/axios';
-import type { User, PaginatedUsers, CreateUserDto, UpdateUserDto, AssignStationDto, TransferStationDto, UserFilters, Sanction, CreateSanctionDto, LiftSanctionDto, Promotion, CreatePromotionDto } from './types';
+import type { User, PaginatedUsers, CreateUserDto, UpdateUserDto, AssignStationDto, TransferStationDto, UserFilters, Sanction, CreateSanctionDto, LiftSanctionDto, Promotion, CreatePromotionDto, LeaderboardEntry } from './types';
 
 export const usersApi = {
     findAll: async (filters?: UserFilters): Promise<PaginatedUsers> => {
@@ -64,6 +64,11 @@ export const usersApi = {
 
     promoteUser: async ({ id, data }: { id: number; data: CreatePromotionDto }): Promise<Promotion> => {
         const response = await apiClient.post<Promotion>(`/users/${id}/promote`, data);
+        return response.data;
+    },
+
+    getLeaderboard: async (type: 'laveurs' | 'commerciaux', stationId?: number): Promise<LeaderboardEntry[]> => {
+        const response = await apiClient.get<LeaderboardEntry[]>('/users/leaderboard', { params: { type, stationId } });
         return response.data;
     },
 };

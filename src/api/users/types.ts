@@ -109,3 +109,11 @@ export interface CreatePromotionDto {
     nouveauRole: string;
     motif: string;
 }
+
+export interface LeaderboardEntry {
+    id: number;
+    nom: string;
+    prenom: string;
+    totalPoints: number;
+    rank: number;
+}

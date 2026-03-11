@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, Phone, Mail, Car, Award, Droplets, Wallet,
-  Calendar, CreditCard, Tag, Palette, Truck, Loader2,
+  Calendar, CreditCard, Tag, Palette, Truck, Loader2, MapPin,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -159,6 +159,11 @@ export default function ClientDetail() {
               {client.email && (
                 <span className="text-sm text-ink-faded flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5" /> {client.email}
+                </span>
+              )}
+              {client.quartier && (
+                <span className="text-sm text-ink-faded flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" /> {client.quartier}
                 </span>
               )}
               <span className="text-xs text-ink-muted flex items-center gap-1">

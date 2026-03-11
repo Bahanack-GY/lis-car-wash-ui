@@ -5,8 +5,10 @@ import toast from 'react-hot-toast'
 import {
   Users, Search, Plus, Phone, Car, Award, CreditCard,
   ChevronRight, ChevronLeft, X, Mail, Palette, Tag, Truck,
+  SlidersHorizontal, CalendarDays, MapPin, Download,
 } from 'lucide-react'
 import { useClients, useCreateClient, useCreateVehicle } from '@/api/clients'
+import { clientsApi } from '@/api/clients/api'
 import type { CreateClientDto, CreateVehicleDto, Client } from '@/api/clients/types'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -22,6 +24,15 @@ export default function Clients() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [vehicleType, setVehicleType] = useState('')
+  const [phoneFilter, setPhoneFilter] = useState('')
+  const [debouncedPhone, setDebouncedPhone] = useState('')
+  const [quartierFilter, setQuartierFilter] = useState('')
+  const [debouncedQuartier, setDebouncedQuartier] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
 
   /* ── Debounce search ─────────────────────────────── */
   useEffect(() => {
@@ -32,12 +43,92 @@ export default function Clients() {
     return () => clearTimeout(timer)
   }, [search])
 
+  /* ── Debounce phone ──────────────────────────────── */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhone(phoneFilter)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [phoneFilter])
+
+  /* ── Debounce quartier ───────────────────────────── */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuartier(quartierFilter)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [quartierFilter])
+
+  const activeFilterCount = [vehicleType, debouncedPhone, debouncedQuartier, dateFrom, dateTo].filter(Boolean).length
+
+  const clearFilters = () => {
+    setVehicleType('')
+    setPhoneFilter('')
+    setDebouncedPhone('')
+    setQuartierFilter('')
+    setDebouncedQuartier('')
+    setDateFrom('')
+    setDateTo('')
+    setPage(1)
+  }
+
+  /* ── Export CSV ──────────────────────────────────── */
+  const handleExport = async () => {
+    setIsExporting(true)
+    try {
+      const clients = await clientsApi.exportAll({
+        search: debouncedSearch || undefined,
+        stationId: selectedStationId || undefined,
+        vehicleType: vehicleType || undefined,
+        contact: debouncedPhone || undefined,
+        quartier: debouncedQuartier || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      })
+
+      const headers = ['Nom', 'Téléphone', 'Email', 'Quartier', 'Type(s) véhicule', 'Points fidélité', 'Date inscription']
+      const rows = clients.map(c => [
+        c.nom,
+        c.contact || '',
+        c.email || '',
+        c.quartier || '',
+        c.vehicleTypes || '',
+        String(c.pointsFidelite ?? 0),
+        new Date(c.createdAt).toLocaleDateString('fr-FR'),
+      ])
+
+      const csv = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+        .join('\n')
+
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `clients_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`${clients.length} client(s) exporté(s)`)
+    } catch {
+      toast.error('Erreur lors de l\'export')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   /* ── Queries ─────────────────────────────────────── */
   const { data: clientsData, isLoading, isError } = useClients({
     search: debouncedSearch || undefined,
     page,
     limit: 12,
     stationId: selectedStationId || undefined,
+    vehicleType: vehicleType || undefined,
+    contact: debouncedPhone || undefined,
+    quartier: debouncedQuartier || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
   })
 
   const clientsList: Client[] = clientsData?.data || []
@@ -72,12 +163,22 @@ export default function Clients() {
             </h1>
             <p className="text-ink-faded mt-1">Gestion CRM, abonnements et fidélité</p>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-teal-500/25 hover:shadow-teal-500/35 transition-shadow text-sm"
-          >
-            <Plus className="w-4 h-4" /> Nouveau client
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className="flex items-center gap-2 px-4 py-2.5 bg-panel border border-edge text-ink-muted hover:text-ink hover:border-teal-500/30 font-medium rounded-xl transition-colors text-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {isExporting ? 'Export...' : 'Exporter'}
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-teal-600 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-teal-500/25 hover:shadow-teal-500/35 transition-shadow text-sm"
+            >
+              <Plus className="w-4 h-4" /> Nouveau client
+            </button>
+          </div>
         </motion.div>
 
         {/* ── Stats ───────────────────────────────────── */}
@@ -94,17 +195,135 @@ export default function Clients() {
           })}
         </div>
 
-        {/* ── Search ──────────────────────────────────── */}
-        <motion.div variants={rise}>
-          <div className="flex items-center gap-2 bg-panel border border-edge rounded-xl px-4 py-2.5 shadow-sm focus-within:border-teal-500/40 transition-colors">
-            <Search className="w-4 h-4 text-ink-muted" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher par nom, téléphone, email..."
-              className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
-            />
+        {/* ── Search + Filter toggle ───────────────────── */}
+        <motion.div variants={rise} className="space-y-3">
+          <div className="flex gap-2">
+            <div className="flex items-center gap-2 bg-panel border border-edge rounded-xl px-4 py-2.5 shadow-sm focus-within:border-teal-500/40 transition-colors flex-1">
+              <Search className="w-4 h-4 text-ink-muted shrink-0" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Rechercher par nom, téléphone, email, marque, modèle..."
+                className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
+              />
+            </div>
+            <button
+              onClick={() => setShowFilters(v => !v)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors shrink-0 ${
+                showFilters || activeFilterCount > 0
+                  ? 'bg-teal-500/10 border-teal-500/40 text-accent'
+                  : 'bg-panel border-edge text-ink-muted hover:text-ink hover:border-teal-500/30'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Filtres
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-teal-500 text-white text-xs flex items-center justify-center font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
+
+          {/* ── Filter panel ────────────────────────── */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-panel border border-edge rounded-xl p-4 shadow-sm space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Vehicle type */}
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-1.5">
+                        <Car className="w-3 h-3" /> Type de véhicule
+                      </label>
+                      <select
+                        value={vehicleType}
+                        onChange={(e) => { setVehicleType(e.target.value); setPage(1) }}
+                        className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-sm text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all"
+                      >
+                        <option value="">Tous les types</option>
+                        <option value="Berline">Berline</option>
+                        <option value="SUV">SUV</option>
+                        <option value="4x4">4x4</option>
+                        <option value="Break">Break</option>
+                        <option value="Monospace">Monospace</option>
+                        <option value="Pickup">Pickup</option>
+                        <option value="Camion">Camion</option>
+                        <option value="Moto">Moto</option>
+                      </select>
+                    </div>
+
+                    {/* Phone */}
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-1.5">
+                        <Phone className="w-3 h-3" /> Téléphone
+                      </label>
+                      <input
+                        type="text"
+                        value={phoneFilter}
+                        onChange={(e) => setPhoneFilter(e.target.value)}
+                        placeholder="77 000 00 00"
+                        className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-sm text-ink placeholder-ink-muted outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all"
+                      />
+                    </div>
+
+                    {/* Quartier */}
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-1.5">
+                        <MapPin className="w-3 h-3" /> Quartier
+                      </label>
+                      <input
+                        type="text"
+                        value={quartierFilter}
+                        onChange={(e) => setQuartierFilter(e.target.value)}
+                        placeholder="Plateau, Almadies..."
+                        className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-sm text-ink placeholder-ink-muted outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all"
+                      />
+                    </div>
+
+                    {/* Date range */}
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-1.5">
+                        <CalendarDays className="w-3 h-3" /> Date d'inscription
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
+                          className="w-full px-2 py-2 bg-inset border border-outline rounded-xl text-sm text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all"
+                        />
+                        <input
+                          type="date"
+                          value={dateTo}
+                          min={dateFrom}
+                          onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
+                          className="w-full px-2 py-2 bg-inset border border-outline rounded-xl text-sm text-ink outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {activeFilterCount > 0 && (
+                    <div className="flex justify-end pt-1 border-t border-divider">
+                      <button
+                        onClick={clearFilters}
+                        className="flex items-center gap-1.5 text-xs text-ink-muted hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" /> Réinitialiser les filtres
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* ── Content ─────────────────────────────────── */}
@@ -124,7 +343,7 @@ export default function Clients() {
         ) : (
           <>
             <motion.div
-              key={`${debouncedSearch}-${page}`}
+              key={`${debouncedSearch}-${debouncedPhone}-${debouncedQuartier}-${vehicleType}-${dateFrom}-${dateTo}-${page}`}
               variants={stagger}
               initial="hidden"
               animate="show"
@@ -139,7 +358,7 @@ export default function Clients() {
                 return (
                   <motion.div key={c.id} variants={rise} onClick={() => navigate(`/clients/${c.id}`)} className="bg-panel border border-edge rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 group cursor-pointer">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-sm shrink-0">
+                      <div className="w-12 h-12 rounded-full bg-linear-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-sm shrink-0">
                         {initials}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -231,7 +450,7 @@ function CreateClientModal({ onClose, stationId }: { onClose: () => void; statio
   const createClient = useCreateClient()
   const createVehicle = useCreateVehicle()
 
-  const [formData, setFormData] = useState<CreateClientDto>({ nom: '', contact: '', email: '' })
+  const [formData, setFormData] = useState<CreateClientDto>({ nom: '', contact: '', email: '', quartier: '' })
   const [addVehicle, setAddVehicle] = useState(false)
   const [vehicleData, setVehicleData] = useState<CreateVehicleDto>({
     immatriculation: '', modele: '', brand: '', color: '', type: '',
@@ -322,6 +541,19 @@ function CreateClientModal({ onClose, stationId }: { onClose: () => void; statio
                 placeholder="client@email.com"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1 text-xs font-semibold text-ink-faded uppercase tracking-wider mb-1.5">
+              <MapPin className="w-3 h-3" /> Quartier
+            </label>
+            <input
+              type="text"
+              value={formData.quartier}
+              onChange={(e) => setFormData({ ...formData, quartier: e.target.value })}
+              className={inputCls}
+              placeholder="Plateau, Almadies, Ouakam..."
+            />
           </div>
 
           {/* ── Vehicle toggle ─────────────────────── */}

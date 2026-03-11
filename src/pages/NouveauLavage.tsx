@@ -18,6 +18,7 @@ import {
   X,
   Car,
   Plus,
+  MapPin,
 } from 'lucide-react'
 import Logo from '@/assets/Logo.png'
 
@@ -128,6 +129,7 @@ export default function NouveauLavage() {
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newQuartier, setNewQuartier] = useState('')
 
   // Vehicle — existing vs new
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null)
@@ -265,6 +267,7 @@ export default function NouveauLavage() {
           nom: newName,
           contact: newPhone,
           email: newEmail,
+          quartier: newQuartier || undefined,
           stationId: selectedStationId || undefined,
         })
         finalClientId = newC.id
@@ -518,9 +521,15 @@ export default function NouveauLavage() {
                             <label className="block text-xs font-medium text-ink-light mb-1.5">Téléphone *</label>
                             <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+221 7X XXX XXXX" className={inputCls} />
                           </div>
-                          <div className="sm:col-span-2">
+                          <div>
                             <label className="block text-xs font-medium text-ink-light mb-1.5">Email</label>
                             <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@exemple.com" className={inputCls} />
+                          </div>
+                          <div>
+                            <label className="flex items-center gap-1 text-xs font-medium text-ink-light mb-1.5">
+                              <MapPin className="w-3 h-3" /> Quartier
+                            </label>
+                            <input value={newQuartier} onChange={(e) => setNewQuartier(e.target.value)} placeholder="Plateau, Almadies..." className={inputCls} />
                           </div>
                         </div>
                       )}

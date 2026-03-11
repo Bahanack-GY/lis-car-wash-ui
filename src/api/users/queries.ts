@@ -10,6 +10,7 @@ export const USERS_KEYS = {
     detail: (id: number) => [...USERS_KEYS.details(), id] as const,
     availableWashers: (stationId: number) => [...USERS_KEYS.all, 'availableWashers', stationId] as const,
     performance: (id: number, stationId?: number, startDate?: string, endDate?: string) => [...USERS_KEYS.detail(id), 'performance', stationId, startDate, endDate] as const,
+    leaderboard: (type: string, stationId?: number) => [...USERS_KEYS.all, 'leaderboard', type, stationId] as const,
 };
 
 export const useUsers = (filters?: UserFilters) => {
@@ -135,5 +136,12 @@ export const usePromoteUser = () => {
             queryClient.invalidateQueries({ queryKey: USERS_KEYS.detail(variables.id) });
             queryClient.invalidateQueries({ queryKey: USERS_KEYS.lists() });
         },
+    });
+};
+
+export const useLeaderboard = (type: 'laveurs' | 'commerciaux', stationId?: number) => {
+    return useQuery({
+        queryKey: USERS_KEYS.leaderboard(type, stationId),
+        queryFn: () => usersApi.getLeaderboard(type, stationId),
     });
 };
