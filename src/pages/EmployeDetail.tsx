@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -7,17 +7,18 @@ import {
   Pencil, Save, X, ArrowRightLeft, UserCog, Clock, CheckCircle2, XCircle,
   Car, Award, CalendarDays, TrendingUp, AlertTriangle, Ban, UserX, RotateCcw, ShieldAlert,
   Banknote, ClipboardList, CreditCard, Hash, ArrowUpCircle, Megaphone, Target,
-} from 'lucide-react'
+} from '@/lib/icons'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer,
   AreaChart, Area,
 } from 'recharts'
-import { useUser, useUpdateUser, useTransferStation, useUserPerformance, useAddSanction, useLiftSanction, usePromoteUser } from '@/api/users'
+import { useUser, useUpdateUser, useTransferStation, useUserPerformance, useAddSanction, useLiftSanction, usePromoteUser, useUploadAvatar } from '@/api/users'
 import { useStations } from '@/api/stations'
 import { useCaisseTransactions } from '@/api/caisse'
 import { useFichesPiste } from '@/api/fiches-piste'
-import { useCommercialStatsByUser } from '@/api/commercial/queries'
+import { useCommercialStatsByUser, useTransferPortfolio } from '@/api/commercial/queries'
+import { useUsers } from '@/api/users'
 import type { Affectation, Sanction, SanctionType, Promotion } from '@/api/users/types'
 import type { Paiement } from '@/api/paiements/types'
 import type { FichePiste } from '@/api/fiches-piste/types'
@@ -109,6 +110,8 @@ export default function EmployeDetail() {
   const { data: user, isLoading, isError } = useUser(userId)
   const { data: stationsList } = useStations()
   const updateUser = useUpdateUser()
+  const uploadAvatar = useUploadAvatar()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const transferStation = useTransferStation()
 
   // Period state
@@ -160,9 +163,15 @@ export default function EmployeDetail() {
   // Sanction state
   const addSanction = useAddSanction()
   const liftSanction = useLiftSanction()
+  const transferPortfolio = useTransferPortfolio()
   const [showSanctionModal, setShowSanctionModal] = useState(false)
   const [sanctionType, setSanctionType] = useState<SanctionType>('avertissement')
   const [sanctionMotif, setSanctionMotif] = useState('')
+  const [portfolioTransferTo, setPortfolioTransferTo] = useState<number | ''>('')
+
+  // For portfolio transfer: list of commercials at same station
+  const { data: allUsers } = useUsers(user?.stationId ? { stationId: user.stationId } : undefined)
+  const otherCommercials = (allUsers?.data ?? []).filter(u => u.role === 'commercial' && u.id !== userId)
   const [showLiftModal, setShowLiftModal] = useState(false)
   const [liftTargetId, setLiftTargetId] = useState<number | null>(null)
   const [liftNote, setLiftNote] = useState('')
@@ -345,9 +354,20 @@ export default function EmployeDetail() {
       await addSanction.mutateAsync({ id: user.id, data: { type: sanctionType, motif: sanctionMotif.trim() } })
       const labels: Record<SanctionType, string> = { avertissement: 'Avertissement', suspension: 'Suspension', renvoi: 'Renvoi' }
       toast.success(`${labels[sanctionType]} appliqué avec succès`)
+
+      // Transfer portfolio if commercial and sanction is suspension/renvoi
+      if (user.role === 'commercial' && (sanctionType === 'suspension' || sanctionType === 'renvoi')) {
+        await transferPortfolio.mutateAsync({
+          fromCommercialId: user.id,
+          toCommercialId: portfolioTransferTo ? Number(portfolioTransferTo) : null,
+        })
+        toast.success(portfolioTransferTo ? 'Portefeuille transféré' : 'Portefeuille libéré (non attribué)')
+      }
+
       setShowSanctionModal(false)
       setSanctionType('avertissement')
       setSanctionMotif('')
+      setPortfolioTransferTo('')
     } catch {
       toast.error("Erreur lors de l'ajout de la sanction")
     }
@@ -364,9 +384,20 @@ export default function EmployeDetail() {
     try {
       await liftSanction.mutateAsync({ sanctionId: liftTargetId, userId: user.id, data: { noteLevee: liftNote.trim() || undefined } })
       toast.success('Sanction levée avec succès')
+
+      // Restore portfolio from another commercial if selected
+      if (user.role === 'commercial' && portfolioTransferTo) {
+        await transferPortfolio.mutateAsync({
+          fromCommercialId: Number(portfolioTransferTo),
+          toCommercialId: user.id,
+        })
+        toast.success('Portefeuille rapatrié avec succès')
+      }
+
       setShowLiftModal(false)
       setLiftTargetId(null)
       setLiftNote('')
+      setPortfolioTransferTo('')
     } catch {
       toast.error('Erreur lors de la levée de la sanction')
     }
@@ -467,8 +498,50 @@ export default function EmployeDetail() {
         </button>
 
         <div className="flex items-center gap-4 flex-1">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-xl shrink-0 shadow-lg shadow-teal-500/20 uppercase">
-            {initials}
+          {/* Avatar with upload */}
+          <div className="relative shrink-0 group">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg shadow-teal-500/20">
+              {user.profilePicture ? (
+                <img
+                  src={`${import.meta.env.VITE_API_URL?.replace('/api', '') ?? 'http://localhost:3001'}${user.profilePicture}`}
+                  alt={initials}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-xl uppercase">
+                  {initials}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadAvatar.isPending}
+              className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+              title="Changer la photo"
+            >
+              {uploadAvatar.isPending ? (
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+              ) : (
+                <Pencil className="w-5 h-5 text-white" />
+              )}
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                try {
+                  await uploadAvatar.mutateAsync({ id: user.id, file })
+                  toast.success('Photo mise à jour')
+                } catch {
+                  toast.error('Erreur lors du téléchargement')
+                }
+                e.target.value = ''
+              }}
+            />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
@@ -1472,6 +1545,23 @@ export default function EmployeDetail() {
                   </div>
                 )}
 
+                {(sanctionType === 'suspension' || sanctionType === 'renvoi') && user?.role === 'commercial' && (
+                  <div className="p-3 rounded-xl border border-blue-200 bg-blue-500/5">
+                    <p className="text-xs font-semibold text-blue-600 mb-2">Transfert du portefeuille clients</p>
+                    <p className="text-xs text-ink-muted mb-2">Ce commercial a un portefeuille clients. Choisissez à qui le transférer.</p>
+                    <select
+                      value={portfolioTransferTo}
+                      onChange={(e) => setPortfolioTransferTo(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink text-sm outline-none focus:border-blue-400"
+                    >
+                      <option value="">— Laisser sans attribution —</option>
+                      {otherCommercials.map(c => (
+                        <option key={c.id} value={c.id}>{c.prenom} {c.nom}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-ink-light mb-1.5">Motif</label>
                   <textarea
@@ -1538,15 +1628,34 @@ export default function EmployeDetail() {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-ink-light mb-1.5">Note (optionnelle)</label>
-                <textarea
-                  value={liftNote}
-                  onChange={(e) => setLiftNote(e.target.value)}
-                  placeholder="Raison de la levée de sanction..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 bg-inset border border-outline rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 resize-none"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-ink-light mb-1.5">Note (optionnelle)</label>
+                  <textarea
+                    value={liftNote}
+                    onChange={(e) => setLiftNote(e.target.value)}
+                    placeholder="Raison de la levée de sanction..."
+                    rows={3}
+                    className="w-full px-3 py-2.5 bg-inset border border-outline rounded-xl text-ink text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 resize-none"
+                  />
+                </div>
+
+                {user?.role === 'commercial' && otherCommercials.length > 0 && (
+                  <div className="p-3 rounded-xl border border-blue-200 bg-blue-500/5">
+                    <p className="text-xs font-semibold text-blue-600 mb-1">Récupérer le portefeuille</p>
+                    <p className="text-xs text-ink-muted mb-2">Si le portefeuille a été transféré, vous pouvez le rapatrier vers ce commercial.</p>
+                    <select
+                      value={portfolioTransferTo}
+                      onChange={(e) => setPortfolioTransferTo(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full px-3 py-2 bg-inset border border-outline rounded-xl text-ink text-sm outline-none focus:border-blue-400"
+                    >
+                      <option value="">— Ne pas transférer de portefeuille —</option>
+                      {otherCommercials.map(c => (
+                        <option key={c.id} value={c.id}>Récupérer depuis {c.prenom} {c.nom}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 mt-6">

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, MapPin, Users, ArrowRight, LogOut, Sun, Moon, Clock, Search,
-  AlertTriangle, UserCog, BarChart3, Plus, X, Shield, ChevronRight, Check
-} from 'lucide-react'
+  AlertTriangle, UserCog, BarChart3, Plus, X, Shield, Check, Loader2,
+  LayoutList, LayoutGrid,
+} from '@/lib/icons'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import Logo from '@/assets/Logo.png'
@@ -13,22 +14,53 @@ import { useStations, useCreateStation } from '@/api/stations'
 import { useActiveIncidentsByStation } from '@/api/incidents'
 import { useCreateUser, useAssignStation } from '@/api/users'
 
-type StatusFilter = 'all' | 'active' | 'inactive' | 'upcoming'
+// ── Brand palette ────────────────────────────────────────────────────────
+const NAVY = '#283852'
+const TEAL = '#33cbcc'
+const WASH = '#e3f6f6'
+
+type StatusFilter   = 'all' | 'active' | 'inactive' | 'upcoming'
 type IncidentFilter = 'all' | 'no_incident' | 'incident' | 'stopped'
 
 const statusTabs: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: 'Toutes' },
-  { key: 'active', label: 'Actives' },
-  { key: 'inactive', label: 'Inactives' },
-  { key: 'upcoming', label: 'À venir' },
+  { key: 'all',      label: 'Toutes'   },
+  { key: 'active',   label: 'Actives'  },
+  { key: 'inactive', label: 'Inactives'},
+  { key: 'upcoming', label: 'À venir'  },
 ]
 
 const incidentTabs: { key: IncidentFilter; label: string }[] = [
-  { key: 'all', label: 'Tous' },
-  { key: 'no_incident', label: 'Sans incident' },
-  { key: 'incident', label: 'Avec incident' },
-  { key: 'stopped', label: 'Activité arrêtée' },
+  { key: 'all',         label: 'Tous'              },
+  { key: 'no_incident', label: 'Sans incident'     },
+  { key: 'incident',    label: 'Avec incident'     },
+  { key: 'stopped',     label: 'Arrêt d\'activité' },
 ]
+
+// ── Small reusable input ─────────────────────────────────────────────────
+function Field({
+  label, value, onChange, placeholder, type = 'text', required,
+}: {
+  label: string; value: string; onChange: (v: string) => void
+  placeholder?: string; type?: string; required?: boolean
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold mb-1.5 font-body" style={{ color: NAVY, fontFamily: 'var(--font-body)' }}>
+        {label}{required && ' *'}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none transition-all font-body placeholder:text-ink-muted"
+        style={{ fontFamily: 'var(--font-body)' }}
+        onFocus={(e) => { e.target.style.borderColor = TEAL; e.target.style.boxShadow = `0 0 0 3px rgba(51,203,204,0.12)` }}
+        onBlur={(e)  => { e.target.style.borderColor = ''; e.target.style.boxShadow = '' }}
+      />
+    </div>
+  )
+}
 
 export default function SelectStation() {
   const navigate = useNavigate()
@@ -36,29 +68,28 @@ export default function SelectStation() {
   const { user, logout, setStation, defaultPath } = useAuth()
   const { data: stationsData, isLoading, isError } = useStations()
   const { data: incidentStatusMap } = useActiveIncidentsByStation()
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [incidentFilter, setIncidentFilter] = useState<IncidentFilter>('all')
-  const [townFilter, setTownFilter] = useState<string>('all')
 
-  // Create station + manager modal state
-  const [showModal, setShowModal] = useState(false)
-  const [modalStep, setModalStep] = useState<1 | 2>(1)
-  const [createdStationId, setCreatedStationId] = useState<number | null>(null)
+  const [view,           setView]           = useState<'table' | 'grid'>('table')
+  const [search,         setSearch]         = useState('')
+  const [statusFilter,   setStatusFilter]   = useState<StatusFilter>('all')
+  const [incidentFilter, setIncidentFilter] = useState<IncidentFilter>('all')
+  const [townFilter,     setTownFilter]     = useState('all')
+
+  // Modal state
+  const [showModal,         setShowModal]         = useState(false)
+  const [modalStep,         setModalStep]         = useState<1 | 2>(1)
+  const [createdStationId,  setCreatedStationId]  = useState<number | null>(null)
   const [createdStationName, setCreatedStationName] = useState('')
 
-  // Station form
   const [stationForm, setStationForm] = useState({
     nom: '', adresse: '', town: '', contact: '', status: 'active' as const,
   })
-
-  // Manager form
   const [managerForm, setManagerForm] = useState({
     nom: '', prenom: '', email: '', telephone: '', password: '',
   })
 
   const createStation = useCreateStation()
-  const createUser = useCreateUser()
+  const createUser    = useCreateUser()
   const assignStation = useAssignStation()
 
   const stationsList = stationsData || []
@@ -70,42 +101,32 @@ export default function SelectStation() {
 
   const filtered = useMemo(() => {
     let list = stationsList
-
-    if (statusFilter !== 'all') {
-      list = list.filter((s) => s.status === statusFilter)
-    }
-
-    if (townFilter !== 'all') {
-      list = list.filter((s) => s.town === townFilter)
-    }
-
+    if (statusFilter !== 'all')   list = list.filter(s => s.status === statusFilter)
+    if (townFilter   !== 'all')   list = list.filter(s => s.town   === townFilter)
     if (incidentFilter !== 'all' && incidentStatusMap) {
-      list = list.filter((s) => {
+      list = list.filter(s => {
         const iStatus = incidentStatusMap[s.id]
         if (incidentFilter === 'no_incident') return !iStatus
-        if (incidentFilter === 'incident') return !!iStatus
-        if (incidentFilter === 'stopped') return iStatus?.hasStoppingIncident
+        if (incidentFilter === 'incident')    return !!iStatus
+        if (incidentFilter === 'stopped')     return iStatus?.hasStoppingIncident
         return true
       })
     }
-
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter(
-        (s) =>
-          s.nom.toLowerCase().includes(q) ||
-          s.adresse.toLowerCase().includes(q) ||
-          s.town.toLowerCase().includes(q) ||
-          (s.managerName && s.managerName.toLowerCase().includes(q)),
+      list = list.filter(s =>
+        s.nom.toLowerCase().includes(q) ||
+        s.adresse.toLowerCase().includes(q) ||
+        s.town.toLowerCase().includes(q) ||
+        (s.managerName && s.managerName.toLowerCase().includes(q)),
       )
     }
-
     return list
   }, [stationsList, search, statusFilter, townFilter, incidentFilter, incidentStatusMap])
 
   const statusCounts = useMemo(() => ({
-    all: stationsList.length,
-    active: stationsList.filter(s => s.status === 'active').length,
+    all:      stationsList.length,
+    active:   stationsList.filter(s => s.status === 'active').length,
     inactive: stationsList.filter(s => s.status === 'inactive').length,
     upcoming: stationsList.filter(s => s.status === 'upcoming').length,
   }), [stationsList])
@@ -117,513 +138,747 @@ export default function SelectStation() {
   }, [user, defaultPath, navigate])
 
   const select = (id: number, status: string) => {
-    if (status === 'active') {
-      setStation(id)
-      navigate(defaultPath)
-    }
+    if (status === 'active') { setStation(id); navigate(defaultPath) }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/')
-  }
+  const handleLogout = () => { logout(); navigate('/') }
 
   const openModal = () => {
-    setShowModal(true)
-    setModalStep(1)
-    setCreatedStationId(null)
-    setCreatedStationName('')
+    setShowModal(true); setModalStep(1); setCreatedStationId(null); setCreatedStationName('')
     setStationForm({ nom: '', adresse: '', town: '', contact: '', status: 'active' })
     setManagerForm({ nom: '', prenom: '', email: '', telephone: '', password: '' })
   }
 
-  const closeModal = () => {
-    setShowModal(false)
-  }
-
   const handleCreateStation = async () => {
     if (!stationForm.nom.trim() || !stationForm.adresse.trim() || !stationForm.town.trim()) {
-      toast.error('Veuillez remplir tous les champs obligatoires')
-      return
+      toast.error('Veuillez remplir tous les champs obligatoires'); return
     }
     try {
       const station = await createStation.mutateAsync(stationForm)
-      setCreatedStationId(station.id)
-      setCreatedStationName(station.nom)
-      setModalStep(2)
+      setCreatedStationId(station.id); setCreatedStationName(station.nom); setModalStep(2)
       toast.success(`Station "${station.nom}" créée avec succès`)
-    } catch {
-      // error displayed by axios interceptor
-    }
+    } catch { /* handled by interceptor */ }
   }
 
   const handleCreateManager = async () => {
     if (!managerForm.nom.trim() || !managerForm.prenom.trim() || !managerForm.email.trim() || !managerForm.password.trim()) {
-      toast.error('Veuillez remplir tous les champs obligatoires')
-      return
+      toast.error('Veuillez remplir tous les champs obligatoires'); return
     }
     try {
       const newUser = await createUser.mutateAsync({ ...managerForm, role: 'manager' as const })
       const today = new Date().toISOString().split('T')[0]
-      await assignStation.mutateAsync({
-        id: newUser.id,
-        data: { stationId: createdStationId!, dateDebut: today },
-      })
-      toast.success(`Manager ${newUser.prenom} ${newUser.nom} créé et affecté à "${createdStationName}"`)
-      closeModal()
-    } catch {
-      // error displayed by axios interceptor
-    }
+      await assignStation.mutateAsync({ id: newUser.id, data: { stationId: createdStationId!, dateDebut: today } })
+      toast.success(`Manager ${newUser.prenom} ${newUser.nom} créé et affecté`)
+      setShowModal(false)
+    } catch { /* handled by interceptor */ }
   }
 
   const roleLabel: Record<string, string> = {
     super_admin: 'Super Administrateur',
-    manager: 'Manager',
-    controleur: 'Contrôleur',
-    caissiere: 'Caissière',
-    laveur: 'Laveur',
-    commercial: 'Commercial',
-    comptable: 'Comptable',
+    manager: 'Manager', controleur: 'Contrôleur', caissiere: 'Caissière',
+    laveur: 'Laveur', commercial: 'Commercial', comptable: 'Comptable',
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-surface flex flex-col font-sans">
-      {/* Dynamic blurred background bubbles */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-teal-500/20 blur-[120px] mix-blend-screen animate-blob" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-blue-500/10 blur-[130px] mix-blend-screen animate-blob animation-delay-2000" />
-        <div className="absolute top-[20%] right-[30%] w-[40vw] h-[40vw] rounded-full bg-purple-500/10 blur-[100px] mix-blend-screen animate-blob animation-delay-4000" />
-      </div>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--c-surface)' }}>
 
-      {/* Top bar */}
-      <header className="relative z-10 flex items-center justify-between px-6 sm:px-10 py-5 backdrop-blur-md bg-panel/60 border-b border-edge/50">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center shadow-lg shadow-teal-500/20">
-            <img src={Logo} alt="LIS" className="w-6 h-6 object-contain brightness-0 invert" />
-          </div>
-          <div>
-            <h1 className="font-heading font-bold text-base text-ink tracking-tight">LIS Car Wash</h1>
-            <p className="text-[11px] text-ink-muted font-medium uppercase tracking-wider">Système de gestion</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {user && (
-            <div className="hidden sm:flex items-center gap-3 px-4 py-2 rounded-2xl bg-inset/50 backdrop-blur-sm border border-edge/50">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500 to-blue-600 flex items-center justify-center text-white font-bold text-[10px] shadow-sm">
-                {user.prenom[0]}{user.nom[0]}
-              </div>
-              <div className="flex flex-col">
-                 <span className="font-heading font-semibold text-sm text-ink leading-none">{user.prenom} {user.nom}</span>
-                 <span className="text-[10px] text-teal-600 dark:text-teal-400 font-bold uppercase tracking-wider mt-0.5">
-                   {roleLabel[user.role] ?? user.role}
-                 </span>
-              </div>
+      {/* ── Decorative teal arc ─────────────────────── */}
+      <div
+        className="pointer-events-none fixed top-0 right-0 -translate-y-1/3 translate-x-1/3 rounded-full opacity-[0.07]"
+        style={{ width: 700, height: 700, background: TEAL }}
+      />
+
+      {/* ── Top bar ─────────────────────────────────── */}
+      <header className="sticky top-0 z-30 bg-panel border-b border-edge">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3.5">
+          {/* Brand */}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: WASH }}
+            >
+              <img src={Logo} alt="LIS" className="w-6 h-6 object-contain" />
             </div>
-          )}
-          <button
-            onClick={toggle}
-            className="w-10 h-10 flex items-center justify-center text-ink-muted hover:text-ink rounded-2xl hover:bg-raised transition-colors border border-transparent hover:border-edge/50"
-          >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-          <button
-            onClick={handleLogout}
-            className="w-10 h-10 sm:w-auto sm:px-4 flex items-center justify-center gap-2 text-sm font-medium text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Déconnexion</span>
-          </button>
+            <div>
+              <h1 className="font-heading font-bold text-sm leading-tight" style={{ color: NAVY }}>
+                LIS Car Wash
+              </h1>
+              <p className="text-[9px] tracking-widest uppercase font-body" style={{ color: TEAL, fontFamily: 'var(--font-body)' }}>
+                Système de gestion
+              </p>
+            </div>
+          </div>
+
+          {/* Right controls */}
+          <div className="flex items-center gap-2">
+            {/* User badge */}
+            {user && (
+              <div
+                className="hidden sm:flex items-center gap-2.5 px-3.5 py-2 rounded-xl border font-body"
+                style={{ background: WASH, borderColor: 'rgba(51,203,204,0.25)' }}
+              >
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px]"
+                  style={{ background: NAVY, fontFamily: 'var(--font-body)' }}
+                >
+                  {user.prenom[0]}{user.nom[0]}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold leading-none font-body" style={{ color: NAVY, fontFamily: 'var(--font-body)' }}>
+                    {user.prenom} {user.nom}
+                  </p>
+                  <p className="text-[10px] font-medium leading-none mt-0.5 font-body" style={{ color: TEAL, fontFamily: 'var(--font-body)' }}>
+                    {roleLabel[user.role] ?? user.role}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={toggle}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-edge text-ink-muted hover:text-ink hover:bg-raised transition-colors"
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium font-body text-ink-muted hover:text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+              style={{ fontFamily: 'var(--font-body)' }}
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Déconnexion</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="relative z-10 flex-1 px-6 sm:px-10 pb-16 pt-8 overflow-y-auto">
-        <div className="max-w-7xl mx-auto flex flex-col h-full">
-          {/* Header */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-10"
-          >
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-gradient-to-br from-teal-500/20 to-blue-500/20 border border-teal-500/30 backdrop-blur-xl shadow-2xl shadow-teal-500/20 mb-6">
-              <Building2 className="w-10 h-10 text-teal-500" />
-            </div>
-            <h2 className="font-heading text-4xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-blue-600 dark:from-teal-400 dark:to-blue-400 tracking-tight mb-4">
-              Votre Espace de Travail
-            </h2>
-            <p className="text-ink-faded text-lg max-w-2xl mx-auto font-medium">
-              Sélectionnez la station sur laquelle vous opérez aujourd'hui pour accéder à vos outils dédiés.
+      {/* ── Main content ─────────────────────────────── */}
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-10 flex flex-col gap-6 sm:gap-8">
+
+        {/* Page heading */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row sm:items-end justify-between gap-6"
+        >
+          <div>
+            <p
+              className="text-[10px] font-medium tracking-[0.2em] uppercase mb-1 font-body"
+              style={{ color: TEAL, fontFamily: 'var(--font-body)' }}
+            >
+              Sélection de station
             </p>
-            
-            <div className="mt-8 flex items-center justify-center gap-4 flex-wrap">
-              <button
-                onClick={() => navigate('/global-dashboard')}
-                className="group relative inline-flex items-center gap-2 px-6 py-3 bg-panel/50 backdrop-blur-xl border border-edge/80 rounded-2xl text-sm font-bold text-ink hover:border-teal-500/50 hover:shadow-xl hover:shadow-teal-500/10 transition-all duration-300 overflow-hidden"
+            <h2
+              className="font-heading font-bold"
+              style={{ fontSize: 'clamp(26px, 3vw, 36px)', color: NAVY, letterSpacing: '-0.02em', lineHeight: 1.1 }}
+            >
+              Votre espace de travail
+            </h2>
+            <p
+              className="mt-2 text-sm font-body"
+              style={{ color: 'var(--c-ink-faded)', fontFamily: 'var(--font-body)' }}
+            >
+              Sélectionnez la station sur laquelle vous opérez aujourd'hui.
+            </p>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+            <button
+              onClick={() => navigate('/global-dashboard')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold font-body border transition-all"
+              style={{
+                background: WASH,
+                color: NAVY,
+                borderColor: 'rgba(51,203,204,0.3)',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              <BarChart3 className="w-4 h-4" style={{ color: TEAL }} />
+              Dashboard global
+            </button>
+
+            {user?.role === 'super_admin' && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={openModal}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold font-body text-white transition-all"
+                style={{
+                  background: TEAL,
+                  fontFamily: 'var(--font-body)',
+                  boxShadow: `0 4px 14px rgba(51,203,204,0.35)`,
+                }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-teal-500/0 via-teal-500/5 to-teal-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <BarChart3 className="w-4 h-4 text-teal-500 group-hover:scale-110 transition-transform" />
-                Tableau de bord global
+                <Plus className="w-4 h-4" />
+                Créer une station
+              </motion.button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Search + Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="bg-panel border border-edge rounded-2xl p-3 flex flex-col lg:flex-row items-center gap-3"
+        >
+          {/* Search */}
+          <div className="relative w-full lg:w-80 flex-shrink-0">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher une station…"
+              className="w-full pl-10 pr-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none font-body placeholder:text-ink-muted transition-all"
+              style={{ fontFamily: 'var(--font-body)' }}
+              onFocus={(e) => { e.target.style.borderColor = TEAL }}
+              onBlur={(e)  => { e.target.style.borderColor = '' }}
+            />
+          </div>
+
+          {/* Town selector */}
+          {towns.length > 1 && (
+            <div className="relative flex-shrink-0">
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted pointer-events-none" />
+              <select
+                value={townFilter}
+                onChange={(e) => setTownFilter(e.target.value)}
+                className="appearance-none pl-9 pr-8 py-2.5 bg-inset border border-edge rounded-xl text-sm text-ink outline-none cursor-pointer font-body transition-all"
+                style={{ fontFamily: 'var(--font-body)' }}
+              >
+                <option value="all">Toutes les villes</option>
+                {towns.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Separator */}
+          <div className="hidden lg:block h-8 w-px bg-edge flex-shrink-0" />
+
+          {/* Status tabs */}
+          <div
+            className="flex p-1 rounded-xl flex-shrink-0 w-full lg:w-auto overflow-x-auto"
+            style={{ background: 'var(--c-inset)' }}
+          >
+            {statusTabs.map((tab) => {
+              const active = statusFilter === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setStatusFilter(tab.key)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium font-body transition-all whitespace-nowrap"
+                  style={{
+                    background: active ? '#ffffff' : undefined,
+                    color: active ? NAVY : 'var(--c-ink-muted)',
+                    fontWeight: active ? 600 : 400,
+                    boxShadow: active ? '0 1px 4px rgba(40,56,82,0.1)' : undefined,
+                    fontFamily: 'var(--font-body)',
+                  }}
+                >
+                  {tab.label}
+                  {statusCounts[tab.key] > 0 && (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: active ? WASH : 'rgba(0,0,0,0.06)',
+                        color: active ? NAVY : 'var(--c-ink-muted)',
+                      }}
+                    >
+                      {statusCounts[tab.key]}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Incident tabs */}
+          <div
+            className="flex p-1 rounded-xl flex-shrink-0 w-full lg:w-auto overflow-x-auto"
+            style={{ background: 'var(--c-inset)' }}
+          >
+            {incidentTabs.map((tab) => {
+              const active = incidentFilter === tab.key
+              const activeColor =
+                tab.key === 'stopped'     ? '#cc2030' :
+                tab.key === 'incident'    ? '#a06000' :
+                NAVY
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setIncidentFilter(tab.key)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium font-body transition-all whitespace-nowrap"
+                  style={{
+                    background: active ? '#ffffff' : undefined,
+                    color: active ? activeColor : 'var(--c-ink-muted)',
+                    fontWeight: active ? 600 : 400,
+                    boxShadow: active ? '0 1px 4px rgba(40,56,82,0.1)' : undefined,
+                  }}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* View toggle */}
+          <div className="hidden lg:flex items-center gap-1 p-1 rounded-xl flex-shrink-0 ml-auto" style={{ background: 'var(--c-inset)' }}>
+            {([['table', LayoutList], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="p-2 rounded-lg transition-all"
+                style={{
+                  background: view === v ? '#ffffff' : undefined,
+                  color: view === v ? NAVY : 'var(--c-ink-muted)',
+                  boxShadow: view === v ? '0 1px 4px rgba(40,56,82,0.1)' : undefined,
+                }}
+                title={v === 'table' ? 'Vue tableau' : 'Vue grille'}
+              >
+                <Icon className="w-4 h-4" />
               </button>
-              {user?.role === 'super_admin' && (
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Station grid / states */}
+        {isLoading ? (
+          <div className="flex-1 flex justify-center items-center py-24">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin" style={{ color: TEAL }} />
+              <p className="text-sm text-ink-muted font-body" style={{ fontFamily: 'var(--font-body)' }}>
+                Chargement des stations…
+              </p>
+            </div>
+          </div>
+
+        ) : isError ? (
+          <div className="flex-1 flex justify-center items-center py-24">
+            <div className="p-8 bg-red-500/10 border border-red-500/20 rounded-2xl max-w-sm text-center">
+              <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+              <h3 className="font-heading font-bold text-lg text-ink mb-1">Erreur de chargement</h3>
+              <p className="text-sm text-ink-faded font-body" style={{ fontFamily: 'var(--font-body)' }}>
+                Impossible de charger les stations. Veuillez réessayer.
+              </p>
+            </div>
+          </div>
+
+        ) : filtered.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex-1 flex justify-center items-center py-24"
+          >
+            <div className="text-center p-12 bg-panel border border-edge rounded-2xl max-w-sm w-full">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+                style={{ background: WASH }}
+              >
+                <Building2 className="w-8 h-8" style={{ color: TEAL }} />
+              </div>
+              <h3 className="font-heading font-bold text-xl text-ink mb-2">Aucune station trouvée</h3>
+              <p className="text-sm text-ink-faded mb-6 font-body" style={{ fontFamily: 'var(--font-body)' }}>
+                {search || statusFilter !== 'all'
+                  ? 'Aucun résultat pour vos filtres actuels.'
+                  : 'Votre réseau ne compte encore aucune station.'}
+              </p>
+              {!search && statusFilter === 'all' && user?.role === 'super_admin' && (
                 <button
                   onClick={openModal}
-                  className="group relative inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-500 to-blue-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white font-body transition-all"
+                  style={{ background: TEAL, fontFamily: 'var(--font-body)', boxShadow: `0 4px 14px rgba(51,203,204,0.3)` }}
                 >
-                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                  <Plus className="w-4 h-4 relative z-10" />
-                  <span className="relative z-10">Créer une station</span>
+                  <Plus className="w-4 h-4" />
+                  Créer la première station
                 </button>
               )}
             </div>
           </motion.div>
 
-          {/* Search + Filters (Glassmorphic Bar) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+        ) : view === 'table' ? (
+          /* ── Table view ──────────────────────────────── */
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="w-full mx-auto mb-10 p-2 sm:p-3 rounded-[2rem] backdrop-blur-2xl bg-panel/40 border border-white/10 dark:border-white/5 shadow-xl flex flex-col lg:flex-row items-center gap-3 lg:gap-4"
+            transition={{ duration: 0.25 }}
+            className="bg-panel border border-edge rounded-2xl overflow-hidden"
           >
-            {/* Search */}
-            <div className="relative w-full lg:w-96 flex-shrink-0">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher une station..."
-                className="w-full pl-12 pr-6 py-3.5 bg-inset/50 hover:bg-inset/80 focus:bg-inset backdrop-blur-md border border-transparent focus:border-teal-500/50 rounded-2xl text-ink font-medium outline-none transition-all placeholder:text-ink-muted shadow-inner"
-              />
-            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-edge" style={{ background: 'var(--c-inset)' }}>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-ink-muted uppercase tracking-wide font-body">Station</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-ink-muted uppercase tracking-wide font-body hidden md:table-cell">Ville</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-ink-muted uppercase tracking-wide font-body">Statut</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-ink-muted uppercase tracking-wide font-body hidden lg:table-cell">Employés</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-ink-muted uppercase tracking-wide font-body hidden lg:table-cell">Manager</th>
+                  <th className="px-4 py-3.5 text-xs font-semibold text-ink-muted uppercase tracking-wide font-body hidden xl:table-cell">Incidents</th>
+                  <th className="w-16 px-4 py-3.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s, index) => {
+                  const isActive    = s.status === 'active'
+                  const iStatus     = incidentStatusMap?.[s.id]
+                  const hasStopping = isActive && iStatus?.hasStoppingIncident
+                  const hasWarning  = isActive && !hasStopping && iStatus?.hasNonStoppingIncident
+                  const empCount    = (s as any).employeeCount ?? s.activeEmployeesCount ?? 0
 
-            {/* Filters Row */}
-            <div className="flex-1 w-full overflow-x-auto no-scrollbar flex items-center gap-3 lg:justify-end">
-              {/* Town Selector */}
-              {towns.length > 1 && (
-                <div className="relative shrink-0">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" />
-                  <select
-                    value={townFilter}
-                    onChange={(e) => setTownFilter(e.target.value)}
-                    className="appearance-none pl-10 pr-10 py-3 bg-inset/50 hover:bg-inset/80 border border-transparent focus:border-teal-500/50 rounded-2xl font-medium text-sm text-ink outline-none cursor-pointer transition-all"
-                  >
-                    <option value="all">Toutes villes</option>
-                    {towns.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                  const badge = hasStopping
+                    ? { bg: 'rgba(204,32,48,0.1)', color: '#cc2030', text: "À l'arrêt",    dot: '#cc2030' }
+                    : hasWarning
+                    ? { bg: 'rgba(160,96,0,0.1)',  color: '#a06000', text: 'Incident',      dot: '#f59e0b' }
+                    : isActive
+                    ? { bg: WASH,                  color: '#0f7a4a', text: 'Opérationnelle', dot: '#22c55e', ping: true }
+                    : { bg: 'var(--c-inset)',       color: 'var(--c-ink-muted)', text: s.status === 'upcoming' ? 'À venir' : 'Inactive', dot: undefined }
 
-              {/* Status Tabs */}
-              <div className="flex bg-inset/50 backdrop-blur-md p-1.5 rounded-2xl shrink-0">
-                {statusTabs.map((tab) => {
-                  const count = statusCounts[tab.key]
-                  const isActive = statusFilter === tab.key
+                  const incidentBadge = hasStopping
+                    ? { bg: 'rgba(204,32,48,0.08)', color: '#cc2030', text: 'Arrêt activité' }
+                    : hasWarning
+                    ? { bg: 'rgba(160,96,0,0.08)',  color: '#a06000', text: 'En cours'       }
+                    : { bg: 'var(--c-ok-wash)',       color: 'var(--c-ok)', text: 'Aucun'    }
+
                   return (
-                    <button
-                      key={tab.key}
-                      onClick={() => setStatusFilter(tab.key)}
-                      className={`relative px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                    <motion.tr
+                      key={s.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: index * 0.03 }}
+                      onClick={() => select(s.id, s.status)}
+                      className={`border-b border-edge last:border-b-0 group transition-colors ${
                         isActive
-                          ? 'text-teal-700 dark:text-teal-300 bg-white dark:bg-panel shadow-sm'
-                          : 'text-ink-muted hover:text-ink hover:bg-white/50 dark:hover:bg-panel/50'
+                          ? 'cursor-pointer hover:bg-raised'
+                          : 'opacity-50 cursor-not-allowed'
                       }`}
                     >
-                      {tab.label}
-                      {count > 0 && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                          isActive
-                            ? 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400'
-                            : 'bg-black/5 dark:bg-white/5'
-                        }`}>
-                          {count}
+                      {/* Station name + address */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                            style={{ background: isActive ? WASH : 'var(--c-inset)' }}
+                          >
+                            <Building2 className="w-4 h-4" style={{ color: isActive ? TEAL : 'var(--c-ink-muted)' }} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-heading font-semibold text-ink truncate" style={{ letterSpacing: '-0.01em' }}>
+                              {s.nom}
+                            </p>
+                            <p className="text-xs text-ink-muted truncate font-body mt-0.5 flex items-center gap-1">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              {s.adresse}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Ville */}
+                      <td className="px-4 py-4 hidden md:table-cell">
+                        <span className="text-sm text-ink-faded font-body">{s.town}</span>
+                      </td>
+
+                      {/* Status badge */}
+                      <td className="px-4 py-4">
+                        <div
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold font-body whitespace-nowrap"
+                          style={{ background: badge.bg, color: badge.color }}
+                        >
+                          {badge.dot ? (
+                            (badge as any).ping ? (
+                              <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: badge.dot }} />
+                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: badge.dot }} />
+                              </span>
+                            ) : (
+                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: badge.dot }} />
+                            )
+                          ) : (
+                            !isActive && <Clock className="w-3 h-3" />
+                          )}
+                          {badge.text}
+                        </div>
+                      </td>
+
+                      {/* Employees */}
+                      <td className="px-4 py-4 hidden lg:table-cell">
+                        <div className="flex items-center gap-1.5 text-ink-faded font-body">
+                          <Users className="w-3.5 h-3.5 text-ink-muted flex-shrink-0" />
+                          <span className="text-sm">{empCount}</span>
+                        </div>
+                      </td>
+
+                      {/* Manager */}
+                      <td className="px-4 py-4 hidden lg:table-cell">
+                        {s.managerName ? (
+                          <div className="flex items-center gap-1.5">
+                            <div
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                              style={{ background: NAVY }}
+                            >
+                              {s.managerName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <span className="text-sm text-ink font-body truncate max-w-[130px]">{s.managerName}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-muted font-body italic">Sans manager</span>
+                        )}
+                      </td>
+
+                      {/* Incidents */}
+                      <td className="px-4 py-4 hidden xl:table-cell">
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-semibold font-body whitespace-nowrap"
+                          style={{ background: incidentBadge.bg, color: incidentBadge.color }}
+                        >
+                          {(hasStopping || hasWarning) && <AlertTriangle className="w-3 h-3" />}
+                          {incidentBadge.text}
                         </span>
-                      )}
-                    </button>
+                      </td>
+
+                      {/* Action */}
+                      <td className="px-4 py-4">
+                        {isActive && (
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity ml-auto"
+                            style={{ background: hasStopping ? '#cc2030' : hasWarning ? '#a06000' : TEAL }}
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                      </td>
+                    </motion.tr>
                   )
                 })}
-              </div>
-              
-              {/* Incident Tabs */}
-              <div className="flex bg-inset/50 backdrop-blur-md p-1.5 rounded-2xl shrink-0">
-                {incidentTabs.map((tab) => {
-                  const isActive = incidentFilter === tab.key
-                  let activeColors = 'text-teal-700 dark:text-teal-300 bg-white dark:bg-panel shadow-sm'
-                  if (tab.key === 'stopped') activeColors = 'text-red-700 dark:text-red-400 bg-white dark:bg-panel shadow-sm'
-                  else if (tab.key === 'incident') activeColors = 'text-amber-700 dark:text-amber-400 bg-white dark:bg-panel shadow-sm'
-
-                  return (
-                    <button
-                      key={tab.key}
-                      onClick={() => setIncidentFilter(tab.key)}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                        isActive ? activeColors : 'text-ink-muted hover:text-ink hover:bg-white/50 dark:hover:bg-panel/50'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  )
-                })}
-              </div>
-
-            </div>
+              </tbody>
+            </table>
           </motion.div>
 
-          {/* Content Grid */}
-          {isLoading ? (
-            <div className="flex-1 flex justify-center items-center">
-              <div className="relative w-16 h-16">
-                <div className="absolute inset-0 rounded-full border-4 border-teal-500/20" />
-                <div className="absolute inset-0 rounded-full border-4 border-teal-500 border-t-transparent animate-spin" />
-              </div>
-            </div>
-          ) : isError ? (
-            <div className="flex-1 flex justify-center items-center">
-              <div className="p-6 bg-red-500/10 border border-red-500/20 text-red-600 rounded-3xl max-w-md text-center flex flex-col items-center">
-                <AlertTriangle className="w-10 h-10 mb-3 text-red-500" />
-                <h3 className="font-bold text-lg mb-1">Erreur de chargement</h3>
-                <p className="text-sm font-medium">Nous n'avons pas pu charger les stations. Veuillez réessayer.</p>
-              </div>
-            </div>
-          ) : filtered.length === 0 ? (
-            <motion.div 
-               initial={{ opacity: 0, scale: 0.95 }}
-               animate={{ opacity: 1, scale: 1 }}
-               className="flex-1 flex justify-center items-center"
-            >
-              <div className="text-center p-12 bg-panel/30 backdrop-blur-xl border border-white/5 rounded-[3rem] max-w-lg w-full shadow-2xl">
-                <div className="w-24 h-24 rounded-full bg-inset/50 flex items-center justify-center mx-auto mb-6">
-                  <Building2 className="w-10 h-10 text-ink-muted/50" />
-                </div>
-                <h3 className="text-2xl font-heading font-bold text-ink mb-2">Aucune station trouvée</h3>
-                <p className="text-ink-faded font-medium mb-8">
-                  {search || statusFilter !== 'all'
-                    ? "Aucun résultat pour vos filtres actuels."
-                    : "Votre réseau ne compte encore aucune station."}
-                </p>
-                {(!search && statusFilter === 'all') && (
-                  <button
-                    onClick={openModal}
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-teal-500 to-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-teal-500/20 hover:scale-105 transition-transform"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Créer la première station
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filtered.map((s, index) => {
-                const isOpen = s.status === 'active'
-                const iStatus = incidentStatusMap?.[s.id]
-                const hasStopping = isOpen && iStatus?.hasStoppingIncident
-                const hasNonStopping = isOpen && !hasStopping && iStatus?.hasNonStoppingIncident
-                
-                let cardStyle = "bg-panel/60 border-edge/50 hover:border-teal-500/40 hover:shadow-teal-500/10"
-                let badgeStyle = ""
-                let badgeIcon = null
-                let badgeText = ""
+        ) : (
+          /* ── Grid view ───────────────────────────────── */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filtered.map((s, index) => {
+              const isActive     = s.status === 'active'
+              const iStatus      = incidentStatusMap?.[s.id]
+              const hasStopping  = isActive && iStatus?.hasStoppingIncident
+              const hasWarning   = isActive && !hasStopping && iStatus?.hasNonStoppingIncident
+              const empCount     = (s as any).employeeCount ?? s.activeEmployeesCount ?? 0
 
-                if (isOpen) {
-                  if (hasStopping) {
-                    cardStyle = "bg-panel/60 border-red-500/30 hover:border-red-500/60 hover:shadow-red-500/10"
-                    badgeStyle = "bg-red-500/10 text-red-600 border border-red-500/20"
-                    badgeIcon = <AlertTriangle className="w-3.5 h-3.5" />
-                    badgeText = "À l'arrêt"
-                  } else if (hasNonStopping) {
-                    cardStyle = "bg-panel/60 border-amber-500/30 hover:border-amber-500/60 hover:shadow-amber-500/10"
-                    badgeStyle = "bg-amber-500/10 text-amber-600 border border-amber-500/20"
-                    badgeIcon = <AlertTriangle className="w-3.5 h-3.5" />
-                    badgeText = "Incident"
-                  } else {
-                    badgeStyle = "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                    badgeIcon = (
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                      </span>
-                    )
-                    badgeText = "Opérationnelle"
-                  }
-                } else {
-                  cardStyle = "bg-inset/40 border-edge/30 opacity-70 grayscale-[30%] cursor-not-allowed"
-                  badgeStyle = "bg-surface/80 text-ink-muted border border-edge/50"
-                  badgeIcon = <Clock className="w-3.5 h-3.5" />
-                  badgeText = s.status === 'upcoming' ? 'À venir' : 'Inactive'
-                }
+              const cardBorder = hasStopping  ? 'rgba(204,32,48,0.25)'
+                               : hasWarning   ? 'rgba(160,96,0,0.25)'
+                               : 'var(--c-edge)'
 
-                const empCount = (s as any).employeeCount ?? s.activeEmployeesCount ?? 0
+              const badge = hasStopping
+                ? { bg: 'rgba(204,32,48,0.1)', color: '#cc2030', text: 'À l\'arrêt',     dot: '#cc2030' }
+                : hasWarning
+                ? { bg: 'rgba(160,96,0,0.1)',  color: '#a06000', text: 'Incident',        dot: '#f59e0b' }
+                : isActive
+                ? { bg: WASH,                  color: '#0f7a4a', text: 'Opérationnelle',  dot: '#22c55e', ping: true }
+                : { bg: 'var(--c-inset)',       color: 'var(--c-ink-muted)', text: s.status === 'upcoming' ? 'À venir' : 'Inactive', dot: undefined }
 
-                return (
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    key={s.id}
-                    onClick={() => select(s.id, s.status)}
-                    disabled={!isOpen}
-                    className={`group relative text-left p-6 rounded-[2rem] border backdrop-blur-xl transition-all duration-300 flex flex-col h-[280px] shadow-lg overflow-hidden ${cardStyle} ${isOpen ? 'hover:-translate-y-1 hover:shadow-2xl' : ''}`}
-                  >
-                    {/* Hover Glow Effect */}
-                    {isOpen && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                    )}
-
-                    {/* Top Row: Icon + Badge */}
-                    <div className="flex justify-between items-start mb-6 relative z-10">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isOpen ? 'bg-gradient-to-br from-teal-500/20 to-blue-500/10 text-teal-600 dark:text-teal-400' : 'bg-surface text-ink-muted'}`}>
-                        <Building2 className="w-7 h-7" />
-                      </div>
-                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm backdrop-blur-md ${badgeStyle}`}>
-                        {badgeIcon}
-                        {badgeText}
-                      </div>
+              return (
+                <motion.button
+                  key={s.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.04 }}
+                  onClick={() => select(s.id, s.status)}
+                  disabled={!isActive}
+                  className={`group relative text-left p-5 rounded-2xl border bg-panel shadow-sm flex flex-col gap-4 transition-all duration-200 ${
+                    isActive
+                      ? 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'
+                      : 'opacity-60 cursor-not-allowed'
+                  }`}
+                  style={{ borderColor: cardBorder }}
+                >
+                  {/* Top row: icon + badge */}
+                  <div className="flex items-start justify-between">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: isActive ? WASH : 'var(--c-inset)' }}
+                    >
+                      <Building2 className="w-6 h-6" style={{ color: isActive ? TEAL : 'var(--c-ink-muted)' }} />
                     </div>
-
-                    {/* Content */}
-                    <div className="flex-1 relative z-10">
-                      <h3 className="font-heading font-extrabold text-xl text-ink mb-2 line-clamp-1">{s.nom}</h3>
-                      <p className="text-sm font-medium text-ink-faded flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-ink-muted shrink-0 mt-0.5" />
-                        <span className="line-clamp-2">{s.adresse}, {s.town}</span>
-                      </p>
-                    </div>
-
-                    {/* Bottom Row / Insights */}
-                    <div className="flex items-center justify-between pt-5 border-t border-white/10 dark:border-white/5 mt-auto relative z-10">
-                      <div className="flex items-center gap-2 text-sm text-ink-faded group-hover:text-ink transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-inset flex items-center justify-center shrink-0">
-                          <Users className="w-4 h-4 text-ink-muted" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-ink leading-tight">{empCount}</span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Employés</span>
-                        </div>
-                      </div>
-
-                      {s.managerName && (
-                        <div className="flex items-center gap-2 text-sm text-right text-ink-faded group-hover:text-ink transition-colors">
-                           <div className="flex flex-col">
-                            <span className="font-bold text-ink leading-tight truncate max-w-[90px]">{s.managerName}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Manager</span>
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-inset flex items-center justify-center shrink-0">
-                            <UserCog className="w-4 h-4 text-ink-muted" />
-                          </div>
-                        </div>
+                    <div
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold font-body flex-shrink-0"
+                      style={{ background: badge.bg, color: badge.color }}
+                    >
+                      {badge.dot && (
+                        (badge as any).ping ? (
+                          <span className="relative flex h-2 w-2 flex-shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: badge.dot }} />
+                            <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: badge.dot }} />
+                          </span>
+                        ) : (
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: badge.dot }} />
+                        )
                       )}
+                      {!badge.dot && !isActive && <Clock className="w-3 h-3" />}
+                      {!badge.dot && (hasStopping || hasWarning) && <AlertTriangle className="w-3 h-3" />}
+                      {badge.text}
                     </div>
+                  </div>
 
-                    {/* Action Arrow (Visible on hover for active) */}
-                    {isOpen && (
-                       <div className={`absolute bottom-[22px] left-1/2 -translate-x-1/2 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-xl z-20 ${hasStopping ? 'bg-red-500' : hasNonStopping ? 'bg-amber-500' : 'bg-teal-500'}`}>
-                         <ArrowRight className="w-5 h-5" />
-                       </div>
+                  {/* Name + address */}
+                  <div className="flex-1">
+                    <h3 className="font-heading font-bold text-ink text-lg leading-tight mb-1.5 line-clamp-1" style={{ letterSpacing: '-0.01em' }}>
+                      {s.nom}
+                    </h3>
+                    <p className="text-xs flex items-start gap-1.5 font-body" style={{ color: 'var(--c-ink-faded)' }}>
+                      <MapPin className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: 'var(--c-ink-muted)' }} />
+                      <span className="line-clamp-2">{s.adresse}, {s.town}</span>
+                    </p>
+                  </div>
+
+                  {/* Bottom row */}
+                  <div className="flex items-center justify-between pt-4 border-t" style={{ borderColor: 'var(--c-edge)' }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--c-inset)' }}>
+                        <Users className="w-3.5 h-3.5" style={{ color: 'var(--c-ink-muted)' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-ink leading-none font-body">{empCount}</p>
+                        <p className="text-[10px] uppercase tracking-wider font-body" style={{ color: 'var(--c-ink-muted)' }}>Employés</p>
+                      </div>
+                    </div>
+                    {s.managerName ? (
+                      <div className="flex items-center gap-2 text-right">
+                        <div>
+                          <p className="text-sm font-bold text-ink leading-none truncate max-w-[90px] font-body">{s.managerName}</p>
+                          <p className="text-[10px] uppercase tracking-wider font-body" style={{ color: 'var(--c-ink-muted)' }}>Manager</p>
+                        </div>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--c-inset)' }}>
+                          <UserCog className="w-3.5 h-3.5" style={{ color: 'var(--c-ink-muted)' }} />
+                        </div>
+                      </div>
+                    ) : (
+                      isActive && (
+                        <div className="flex items-center gap-1 text-xs font-body" style={{ color: 'var(--c-ink-muted)' }}>
+                          <UserCog className="w-3.5 h-3.5" />
+                          <span>Sans manager</span>
+                        </div>
+                      )
                     )}
-                  </motion.button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+                  </div>
+
+                  {/* Hover CTA */}
+                  {isActive && (
+                    <div
+                      className="absolute bottom-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-white opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200"
+                      style={{ background: hasStopping ? '#cc2030' : hasWarning ? '#a06000' : TEAL }}
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  )}
+                </motion.button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Modern Creation Modal */}
+      {/* ── Create station modal ──────────────────────── */}
       <AnimatePresence>
         {showModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface/80 backdrop-blur-md"
-            onClick={(e) => e.target === e.currentTarget && closeModal()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(40,56,82,0.5)', backdropFilter: 'blur(4px)' }}
+            onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-panel/90 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-[2rem] shadow-2xl w-full max-w-xl overflow-hidden shadow-teal-500/10"
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+              className="bg-panel border border-edge rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
             >
-              <div className="px-8 pt-8 pb-6 border-b border-white/10">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500/20 to-blue-500/20 flex items-center justify-center border border-teal-500/30">
-                        {modalStep === 1 ? <Building2 className="w-6 h-6 text-teal-500" /> : <Shield className="w-6 h-6 text-teal-500" />}
-                     </div>
-                     <div>
-                        <h3 className="font-heading font-extrabold text-2xl text-ink">
-                          {modalStep === 1 ? 'Nouvelle station' : 'Affecter un manager'}
-                        </h3>
-                        <p className="text-sm font-medium text-ink-muted mt-1">Étape {modalStep} sur 2</p>
-                     </div>
+              {/* Modal header */}
+              <div className="px-6 pt-6 pb-5 border-b border-edge">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: WASH }}
+                    >
+                      {modalStep === 1
+                        ? <Building2 className="w-5 h-5" style={{ color: TEAL }} />
+                        : <Shield     className="w-5 h-5" style={{ color: TEAL }} />
+                      }
+                    </div>
+                    <div>
+                      <h3 className="font-heading font-bold text-ink text-lg">
+                        {modalStep === 1 ? 'Nouvelle station' : 'Affecter un manager'}
+                      </h3>
+                      <p className="text-xs text-ink-muted font-body" style={{ fontFamily: 'var(--font-body)' }}>
+                        Étape {modalStep} sur 2
+                      </p>
+                    </div>
                   </div>
-                  <button onClick={closeModal} className="w-10 h-10 flex items-center justify-center text-ink-muted hover:text-ink rounded-full hover:bg-white/10 transition-colors">
-                    <X className="w-5 h-5" />
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className="w-9 h-9 flex items-center justify-center rounded-xl text-ink-muted hover:text-ink hover:bg-raised border border-edge transition-colors"
+                  >
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-                {/* Modern Stepper */}
-                <div className="relative h-1.5 bg-inset rounded-full overflow-hidden">
-                   <motion.div
-                     initial={{ width: modalStep === 1 ? '0%' : '50%' }}
-                     animate={{ width: modalStep === 1 ? '50%' : '100%' }}
-                     className="absolute top-0 left-0 h-full bg-gradient-to-r from-teal-500 to-blue-500"
-                   />
+
+                {/* Progress bar */}
+                <div className="h-1.5 bg-inset rounded-full overflow-hidden">
+                  <motion.div
+                    animate={{ width: modalStep === 1 ? '50%' : '100%' }}
+                    transition={{ duration: 0.3 }}
+                    className="h-full rounded-full"
+                    style={{ background: TEAL }}
+                  />
                 </div>
               </div>
 
-              <div className="px-8 py-6 space-y-5 max-h-[60vh] overflow-y-auto">
+              {/* Modal body */}
+              <div className="px-6 py-5 space-y-4 max-h-[55vh] overflow-y-auto">
                 {modalStep === 1 ? (
                   <>
-                    <div>
-                      <label className="block text-sm font-bold text-ink mb-2">Nom de la station *</label>
-                      <input
-                        type="text"
-                        value={stationForm.nom}
-                        onChange={(e) => setStationForm(f => ({ ...f, nom: e.target.value }))}
-                        placeholder="Ex: LIS Douala Akwa"
-                        className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-ink mb-2">Adresse détaillée *</label>
-                      <input
-                        type="text"
-                        value={stationForm.adresse}
-                        onChange={(e) => setStationForm(f => ({ ...f, adresse: e.target.value }))}
-                        placeholder="Ex: Rue de la Joie, Akwa"
-                        className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                      />
-                    </div>
+                    <Field
+                      label="Nom de la station" required
+                      value={stationForm.nom}
+                      onChange={(v) => setStationForm(f => ({ ...f, nom: v }))}
+                      placeholder="Ex : LIS Douala Akwa"
+                    />
+                    <Field
+                      label="Adresse" required
+                      value={stationForm.adresse}
+                      onChange={(v) => setStationForm(f => ({ ...f, adresse: v }))}
+                      placeholder="Ex : Rue de la Joie, Akwa"
+                    />
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-bold text-ink mb-2">Ville *</label>
-                        <input
-                          type="text"
-                          value={stationForm.town}
-                          onChange={(e) => setStationForm(f => ({ ...f, town: e.target.value }))}
-                          placeholder="Ex: Douala"
-                          className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-ink mb-2">Contact</label>
-                        <input
-                          type="text"
-                          value={stationForm.contact}
-                          onChange={(e) => setStationForm(f => ({ ...f, contact: e.target.value }))}
-                          placeholder="Ex: 6 99 00 00 00"
-                          className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                        />
-                      </div>
+                      <Field
+                        label="Ville" required
+                        value={stationForm.town}
+                        onChange={(v) => setStationForm(f => ({ ...f, town: v }))}
+                        placeholder="Ex : Douala"
+                      />
+                      <Field
+                        label="Contact"
+                        value={stationForm.contact}
+                        onChange={(v) => setStationForm(f => ({ ...f, contact: v }))}
+                        placeholder="6 99 00 00 00"
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-ink mb-2">Statut opérationnel</label>
+                      <label className="block text-xs font-semibold mb-1.5 font-body" style={{ color: NAVY, fontFamily: 'var(--font-body)' }}>
+                        Statut
+                      </label>
                       <select
                         value={stationForm.status}
                         onChange={(e) => setStationForm(f => ({ ...f, status: e.target.value as any }))}
-                        className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all cursor-pointer appearance-none"
+                        className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-ink text-sm outline-none font-body cursor-pointer appearance-none transition-all"
+                        style={{ fontFamily: 'var(--font-body)' }}
+                        onFocus={(e) => { e.target.style.borderColor = TEAL }}
+                        onBlur={(e)  => { e.target.style.borderColor = '' }}
                       >
                         <option value="active">Active (Opérationnelle)</option>
                         <option value="upcoming">À venir (En préparation)</option>
@@ -633,95 +888,63 @@ export default function SelectStation() {
                   </>
                 ) : (
                   <>
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-4 mb-2">
-                       <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
-                          <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                       </div>
-                       <div>
-                          <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Station créée avec succès</p>
-                          <p className="text-sm font-medium text-emerald-600/80 dark:text-emerald-400/80">{createdStationName}</p>
-                       </div>
+                    {/* Success notice */}
+                    <div
+                      className="p-3.5 rounded-xl flex items-center gap-3"
+                      style={{ background: 'var(--c-ok-wash)', border: '1px solid var(--c-ok-line)' }}
+                    >
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--c-ok-wash)' }}>
+                        <Check className="w-4 h-4" style={{ color: 'var(--c-ok)' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold font-body" style={{ color: 'var(--c-ok)', fontFamily: 'var(--font-body)' }}>
+                          Station créée avec succès
+                        </p>
+                        <p className="text-xs font-body" style={{ color: 'var(--c-ok)', opacity: 0.8, fontFamily: 'var(--font-body)' }}>
+                          {createdStationName}
+                        </p>
+                      </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-bold text-ink mb-2">Nom *</label>
-                        <input
-                          type="text"
-                          value={managerForm.nom}
-                          onChange={(e) => setManagerForm(f => ({ ...f, nom: e.target.value }))}
-                          placeholder="Ex: Ndi"
-                          className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-ink mb-2">Prénom *</label>
-                        <input
-                          type="text"
-                          value={managerForm.prenom}
-                          onChange={(e) => setManagerForm(f => ({ ...f, prenom: e.target.value }))}
-                          placeholder="Ex: Paul"
-                          className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                        />
-                      </div>
+                      <Field label="Nom" required value={managerForm.nom}    onChange={(v) => setManagerForm(f => ({ ...f, nom: v }))}    placeholder="Ex : Ndi" />
+                      <Field label="Prénom" required value={managerForm.prenom} onChange={(v) => setManagerForm(f => ({ ...f, prenom: v }))} placeholder="Ex : Paul" />
                     </div>
-                    <div>
-                      <label className="block text-sm font-bold text-ink mb-2">Email *</label>
-                      <input
-                        type="email"
-                        value={managerForm.email}
-                        onChange={(e) => setManagerForm(f => ({ ...f, email: e.target.value }))}
-                        placeholder="paul.ndi@lis-carwash.cm"
-                        className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                      />
-                    </div>
+                    <Field label="Email" required type="email" value={managerForm.email} onChange={(v) => setManagerForm(f => ({ ...f, email: v }))} placeholder="paul.ndi@lis-carwash.cm" />
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-bold text-ink mb-2">Téléphone</label>
-                        <input
-                          type="text"
-                          value={managerForm.telephone}
-                          onChange={(e) => setManagerForm(f => ({ ...f, telephone: e.target.value }))}
-                          placeholder="6 99 00 00 00"
-                          className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-ink mb-2">Mot de passe *</label>
-                        <input
-                          type="password"
-                          value={managerForm.password}
-                          onChange={(e) => setManagerForm(f => ({ ...f, password: e.target.value }))}
-                          placeholder="••••••••"
-                          className="w-full px-4 py-3 bg-inset/50 backdrop-blur-sm border border-edge rounded-2xl text-ink font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 placeholder:text-ink-muted transition-all"
-                        />
-                      </div>
+                      <Field label="Téléphone" value={managerForm.telephone} onChange={(v) => setManagerForm(f => ({ ...f, telephone: v }))} placeholder="6 99 00 00 00" />
+                      <Field label="Mot de passe" required type="password" value={managerForm.password} onChange={(v) => setManagerForm(f => ({ ...f, password: v }))} placeholder="••••••••" />
                     </div>
                   </>
                 )}
               </div>
 
-              <div className="px-8 py-5 border-t border-white/10 bg-panel/50 flex items-center justify-between gap-4">
-                 <button
-                    onClick={modalStep === 1 ? closeModal : closeModal}
-                    className="px-6 py-3 text-sm font-bold text-ink hover:bg-white/10 rounded-2xl transition-all"
-                 >
-                    {modalStep === 1 ? 'Annuler' : 'Passer cette étape'}
-                 </button>
-                 <button
-                    onClick={modalStep === 1 ? handleCreateStation : handleCreateManager}
-                    disabled={modalStep === 1 ? createStation.isPending : (createUser.isPending || assignStation.isPending)}
-                    className="group relative flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-teal-500 to-blue-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-teal-500/20 hover:shadow-teal-500/40 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 overflow-hidden"
-                 >
-                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    <span className="relative z-10 flex items-center gap-2">
-                      {((modalStep === 1 ? createStation.isPending : (createUser.isPending || assignStation.isPending))) ? (
-                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />
-                      ) : (
-                         modalStep === 1 ? <ArrowRight className="w-4 h-4" /> : <Shield className="w-4 h-4" />
-                      )}
-                      {modalStep === 1 ? 'Suivant' : 'Terminer'}
-                    </span>
-                 </button>
+              {/* Modal footer */}
+              <div className="px-6 py-4 border-t border-edge flex items-center justify-between gap-3">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium font-body text-ink-muted hover:text-ink hover:bg-raised border border-edge transition-colors"
+                  style={{ fontFamily: 'var(--font-body)' }}
+                >
+                  {modalStep === 1 ? 'Annuler' : 'Passer'}
+                </button>
+                <button
+                  onClick={modalStep === 1 ? handleCreateStation : handleCreateManager}
+                  disabled={modalStep === 1 ? createStation.isPending : (createUser.isPending || assignStation.isPending)}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white font-body transition-all disabled:opacity-50"
+                  style={{
+                    background: TEAL,
+                    fontFamily: 'var(--font-body)',
+                    boxShadow: `0 4px 14px rgba(51,203,204,0.3)`,
+                  }}
+                >
+                  {(modalStep === 1 ? createStation.isPending : (createUser.isPending || assignStation.isPending)) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    modalStep === 1 ? <ArrowRight className="w-4 h-4" /> : <Shield className="w-4 h-4" />
+                  )}
+                  {modalStep === 1 ? 'Créer la station' : 'Finaliser'}
+                </button>
               </div>
             </motion.div>
           </motion.div>

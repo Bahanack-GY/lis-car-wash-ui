@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Plus, Search, Banknote, TrendingDown, TrendingUp, X, Pencil, ListFilter, Award } from 'lucide-react'
+import { Sparkles, Plus, Search, Banknote, TrendingDown, TrendingUp, X, Pencil, Award, LayoutList, LayoutGrid } from '@/lib/icons'
 import { useExtras, useCreateExtra, useUpdateExtra } from '@/api/extras'
 import type { ExtraService, CreateExtraServiceDto, UpdateExtraServiceDto } from '@/api/extras/types'
 import { useAuth } from '@/contexts/AuthContext'
@@ -17,6 +17,7 @@ const emptyForm: CreateExtraServiceDto = { nom: '', prix: 0, bonus: undefined }
 export default function ServicesSpeciaux() {
   const { selectedStationId } = useAuth()
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'table' | 'grid'>('table')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingExtra, setEditingExtra] = useState<ExtraService | null>(null)
   const [formData, setFormData] = useState<CreateExtraServiceDto>(emptyForm)
@@ -137,9 +138,22 @@ export default function ServicesSpeciaux() {
               className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
             />
           </div>
-          <button className="p-2.5 bg-panel border border-edge rounded-xl text-ink-muted hover:text-ink-light shadow-sm transition-colors">
-            <ListFilter className="w-4 h-4" />
-          </button>
+          <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden shrink-0">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue tableau"
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue grille"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
         </motion.div>
 
         {/* Content */}
@@ -155,6 +169,59 @@ export default function ServicesSpeciaux() {
           <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
             {search ? 'Aucun service ne correspond à la recherche.' : 'Aucun service spécial configuré. Commencez par en créer un.'}
           </div>
+        ) : view === 'table' ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-divider bg-inset">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Service</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Prix (FCFA)</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Bonus laveur</th>
+                  <th className="w-10" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {filtered.map((extra) => (
+                  <tr key={extra.id} className="hover:bg-raised transition-colors group">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-white shrink-0">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <span className="font-medium text-ink">{extra.nom}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="font-semibold text-ok">{formatPrice(extra.prix)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center hidden sm:table-cell">
+                      {extra.bonus != null && Number(extra.bonus) > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-warn bg-amber-500/10 px-2 py-0.5 rounded-md">
+                          <Award className="w-3 h-3" /> {formatPrice(extra.bonus)} F
+                        </span>
+                      ) : (
+                        <span className="text-ink-ghost text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <button
+                        onClick={() => openEdit(extra)}
+                        className="p-1.5 rounded-lg text-ink-ghost hover:text-accent hover:bg-accent-wash transition-colors opacity-0 group-hover:opacity-100"
+                        title="Modifier"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </motion.div>
         ) : (
           <motion.div
             variants={stagger}
@@ -178,7 +245,7 @@ export default function ServicesSpeciaux() {
                       </div>
                       <div>
                         <h3 className="font-heading font-semibold text-ink">{extra.nom}</h3>
-                        <p className="text-xs text-ink-faded mt-0.5">Service sp&eacute;cial</p>
+                        <p className="text-xs text-ink-faded mt-0.5">Service spécial</p>
                       </div>
                     </div>
                     <button

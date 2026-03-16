@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   UserCog, Car, Award, MapPin, Search, X,
   Phone, Mail, Shield, ChevronRight, Star,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useUsers } from '@/api/users/queries'
 import { useStations } from '@/api/stations/queries'
 import type { User, UserFilters } from '@/api/users/types'

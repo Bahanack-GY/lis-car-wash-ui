@@ -4,7 +4,7 @@ import {
   ArrowUpRight, Plus, Search, X, Upload, Paperclip,
   CheckCircle2, TrendingDown, Hash, Crown, FileText,
   ChevronLeft, ChevronRight, Loader2,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { usePaiements, useCreatePaiement, useCaisseSummary } from '@/api/paiements'
 import { paiementsApi } from '@/api/paiements/api'
 import type { Paiement, CreatePaiementDto, TransactionFilters } from '@/api/paiements/types'

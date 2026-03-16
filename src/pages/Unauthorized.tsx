@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ShieldOff } from 'lucide-react'
+import { ShieldOff } from '@/lib/icons'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function Unauthorized() {

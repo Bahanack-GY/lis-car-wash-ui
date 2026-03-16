@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Droplets, Plus, Search, Clock, Banknote, Sparkles, Zap, X, Pencil, ListFilter } from 'lucide-react'
+import { Droplets, Plus, Search, Clock, Banknote, Sparkles, Zap, X, Pencil, LayoutList, LayoutGrid } from '@/lib/icons'
 import { useWashTypes, useCreateWashType, useUpdateWashType } from '@/api/wash-types'
 import type { WashType, CreateWashTypeDto, UpdateWashTypeDto } from '@/api/wash-types/types'
 import { useAuth } from '@/contexts/AuthContext'
@@ -42,6 +42,7 @@ const emptyForm: CreateWashTypeDto = { nom: '', particularites: '', prixBase: 0,
 export default function TypesLavage() {
   const { selectedStationId } = useAuth()
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'table' | 'grid'>('table')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingType, setEditingType] = useState<WashType | null>(null)
   const [formData, setFormData] = useState<CreateWashTypeDto>(emptyForm)
@@ -164,9 +165,22 @@ export default function TypesLavage() {
               className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
             />
           </div>
-          <button className="p-2.5 bg-panel border border-edge rounded-xl text-ink-muted hover:text-ink-light shadow-sm transition-colors">
-            <ListFilter className="w-4 h-4" />
-          </button>
+          <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden shrink-0">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue tableau"
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue grille"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
         </motion.div>
 
         {/* Content */}
@@ -182,6 +196,63 @@ export default function TypesLavage() {
           <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
             {search ? 'Aucun type de lavage ne correspond à la recherche.' : 'Aucun type de lavage configuré. Commencez par en créer un.'}
           </div>
+        ) : view === 'table' ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-divider bg-inset">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Formule</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Description</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Prix (FCFA)</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Durée</th>
+                  <th className="w-10" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {filtered.map((wt) => {
+                  const gradient = tierAccents[wt.nom] || defaultGradient
+                  const TierIcon = tierIcons[wt.nom] || Droplets
+                  return (
+                    <tr key={wt.id} className="hover:bg-raised transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white shrink-0`}>
+                            <TierIcon className="w-4 h-4" />
+                          </div>
+                          <span className="font-medium text-ink">{wt.nom}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-muted hidden md:table-cell max-w-xs">
+                        <span className="line-clamp-1">{wt.particularites || <span className="text-ink-ghost">—</span>}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-semibold text-ok">{formatPrice(wt.prixBase)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center hidden sm:table-cell">
+                        <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                          <Clock className="w-3.5 h-3.5" /> {formatDuration(wt.dureeEstimee)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <button
+                          onClick={() => openEdit(wt)}
+                          className="p-1.5 rounded-lg text-ink-ghost hover:text-accent hover:bg-accent-wash transition-colors opacity-0 group-hover:opacity-100"
+                          title="Modifier"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </motion.div>
         ) : (
           <motion.div
             variants={stagger}
@@ -199,11 +270,9 @@ export default function TypesLavage() {
                   variants={rise}
                   className="bg-panel border border-edge rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 group"
                 >
-                  {/* Gradient header strip */}
                   <div className={`h-1.5 bg-gradient-to-r ${gradient}`} />
 
                   <div className="p-5">
-                    {/* Top row: icon + name + edit */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-sm`}>
@@ -223,12 +292,10 @@ export default function TypesLavage() {
                       </button>
                     </div>
 
-                    {/* Description */}
                     {wt.particularites && (
                       <p className="text-sm text-ink-light leading-relaxed mb-4 line-clamp-2">{wt.particularites}</p>
                     )}
 
-                    {/* Stats row */}
                     <div className="grid grid-cols-2 gap-3 pt-3 border-t border-divider">
                       <div className="bg-inset rounded-xl p-3 text-center">
                         <div className="flex items-center justify-center gap-1.5 mb-1">

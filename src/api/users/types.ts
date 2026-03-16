@@ -50,6 +50,7 @@ export interface User {
     globalAccess?: boolean;
     bonusParLavage?: number | null;
     objectifJournalier?: number | null;
+    profilePicture?: string | null;
     affectations?: Affectation[];
     sanctions?: Sanction[];
     promotions?: Promotion[];

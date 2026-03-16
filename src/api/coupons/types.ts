@@ -21,6 +21,7 @@ export interface Coupon {
     promotionId?: number;
     remise?: number;
     promotion?: { id: number; nom: string; type: string; discountType?: string; discountValue?: number; serviceSpecialId?: number } | null;
+    washingStartedAt?: string | null;
     createdAt: string;
     updatedAt: string;
 }

@@ -4,7 +4,7 @@ import {
   AlertTriangle, AlertCircle, CheckCircle2, Ban,
   Search, X, Info, ShieldAlert, Zap, MapPin,
   Clock, UserCheck,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useIncidents, useUpdateIncident } from '@/api/incidents/queries'
 import type { Incident, IncidentFilters, IncidentSeverity } from '@/api/incidents/types'
 import toast from 'react-hot-toast'

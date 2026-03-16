@@ -145,3 +145,15 @@ export const useLeaderboard = (type: 'laveurs' | 'commerciaux', stationId?: numb
         queryFn: () => usersApi.getLeaderboard(type, stationId),
     });
 };
+
+export const useUploadAvatar = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (args: { id: number; file: File }) => usersApi.uploadAvatar(args),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: USERS_KEYS.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: USERS_KEYS.lists() });
+        },
+    });
+};

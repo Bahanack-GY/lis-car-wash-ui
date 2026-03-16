@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   Users, CreditCard, Car, Award,
   Search, X, ChevronLeft, ChevronRight, ChevronRight as ChevronNav,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useClients } from '@/api/clients/queries'
 import type { ClientFilters } from '@/api/clients/types'
 

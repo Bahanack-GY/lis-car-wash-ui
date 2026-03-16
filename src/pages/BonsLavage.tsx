@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Gift, Plus, Search, X, CheckCircle2, Clock, Copy,
   Ticket, Users, Percent, ChevronLeft, ChevronRight, Printer,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useBonds, useCreateBond } from '@/api/bonds'
 import type { BonLavage, BondFilters } from '@/api/bonds/types'
 import { useStations } from '@/api/stations'

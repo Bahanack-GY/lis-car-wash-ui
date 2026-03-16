@@ -19,7 +19,7 @@ import {
   Car,
   Plus,
   MapPin,
-} from 'lucide-react'
+} from '@/lib/icons'
 import Logo from '@/assets/Logo.png'
 
 import { useWashTypes } from '@/api/wash-types'
@@ -32,6 +32,13 @@ import { useCoupons } from '@/api/coupons'
 import { useAuth } from '@/contexts/AuthContext'
 import { useApplicablePromotions } from '@/api/promotions/queries'
 import type { ApplicablePromotion } from '@/api/promotions/types'
+import { useCommercialPending } from '@/api/commercial/queries'
+
+/* ================================================================
+   AVATAR HELPER
+   ================================================================ */
+const API_ORIGIN = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace('/api', '')
+const avatarUrl = (pic?: string | null) => pic ? `${API_ORIGIN}${pic}` : null
 
 /* ================================================================
    ICONS MAPPING
@@ -107,9 +114,31 @@ export default function NouveauLavage() {
     return ids
   }, [couponsData])
 
+  // Minutes until each busy washer is free (washer ID → minutes remaining, min 1)
+  const busyWasherInfo = useMemo(() => {
+    const info = new Map<number, number>()
+    const coupons = couponsData?.data || []
+    const now = Date.now()
+    for (const c of coupons) {
+      if (c.statut === 'washing' && c.washers && c.fichePiste?.typeLavage?.dureeEstimee) {
+        const startTime = c.washingStartedAt ?? c.updatedAt
+        const startMs = new Date(startTime).getTime()
+        const endMs = startMs + c.fichePiste.typeLavage.dureeEstimee * 60_000
+        const minsLeft = Math.max(1, Math.ceil((endMs - now) / 60_000))
+        for (const w of c.washers) {
+          if (!info.has(w.id) || minsLeft < info.get(w.id)!) {
+            info.set(w.id, minsLeft)
+          }
+        }
+      }
+    }
+    return info
+  }, [couponsData])
+
   // ── Navigation ───────────────────────────────────
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState(0)
+  const [washSearch, setWashSearch] = useState('')
   const goTo = (next: number) => {
     setDirection(next > step ? 1 : -1)
     setStep(next)
@@ -121,9 +150,12 @@ export default function NouveauLavage() {
   const toggleExtra = (id: number) => setSelectedExtrasIds((p) => (p.includes(id) ? p.filter((e) => e !== id) : [...p, id]))
 
   // ── Step 1 — Client ──────────────────────────────
-  const [isNewClient, setIsNewClient] = useState(false)
+  const [clientMode, setClientMode] = useState<'existing' | 'prospect' | 'new'>('existing')
+  const isNewClient = clientMode !== 'existing'
   const [clientSearch, setClientSearch] = useState('')
+  const [prospectSearch, setProspectSearch] = useState('')
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null)
+  const { data: pendingProspects = [] } = useCommercialPending()
 
   // New Client Form
   const [newName, setNewName] = useState('')
@@ -177,6 +209,8 @@ export default function NouveauLavage() {
   const [pickedWasherIds, setPickedWasherIds] = useState<number[]>([])
   const [busyWasherConfirm, setBusyWasherConfirm] = useState<number | null>(null) // washer ID pending confirmation
   const [appliedPromotionId, setAppliedPromotionId] = useState<number | null>(null)
+  const [washerSearch, setWasherSearch] = useState('')
+  const [washerFilter, setWasherFilter] = useState<'all' | 'free' | 'busy'>('all')
 
   const toggleWasher = (id: number) =>
     setPickedWasherIds((prev) =>
@@ -384,39 +418,84 @@ export default function NouveauLavage() {
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
               >
                 {step === 0 && (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     <h3 className="font-heading font-semibold text-ink text-lg">Choisir le type de lavage</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {washTypes.map((w) => {
-                        const sel = washId === w.id
-                        const { icon: WashIcon, gradient } = getWashIconAndGradient(w.nom)
-                        return (
-                          <button
-                            key={w.id}
-                            onClick={() => setWashId(w.id)}
-                            className={`relative text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-                              sel
-                                ? 'border-teal-500 bg-accent-wash'
-                                : 'border-edge bg-inset hover:border-outline'
-                            }`}
-                          >
-                            {sel && (
-                              <div className="absolute top-3 right-3 w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center">
-                                <Check className="w-3 h-3 text-white" />
-                              </div>
-                            )}
-                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center mb-3`}>
-                              <WashIcon className="w-5 h-5 text-accent" />
-                            </div>
-                            <p className="font-heading font-semibold text-ink">{w.nom}</p>
-                            <p className="text-xs text-ink-faded mt-0.5 min-h-[32px]">{w.particularites}</p>
-                            <div className="flex items-center justify-between mt-3 pt-2 border-t border-divider">
-                              <span className="text-sm font-bold text-accent">{w.prixBase.toLocaleString()} FCFA</span>
-                              <span className="text-xs text-ink-muted">{w.dureeEstimee} min</span>
-                            </div>
-                          </button>
-                        )
-                      })}
+
+                    {/* Search bar */}
+                    <div className="flex items-center gap-2 bg-inset border border-outline rounded-xl px-3 py-2 focus-within:border-teal-500/50 transition-colors">
+                      <Search className="w-4 h-4 text-ink-muted shrink-0" />
+                      <input
+                        value={washSearch}
+                        onChange={(e) => setWashSearch(e.target.value)}
+                        placeholder="Rechercher un type de lavage..."
+                        className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
+                      />
+                      {washSearch && (
+                        <button onClick={() => setWashSearch('')} className="text-ink-muted hover:text-ink transition-colors">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Table view */}
+                    <div className="border border-edge rounded-xl overflow-hidden">
+                      {washTypes.filter(w => w.nom.toLowerCase().includes(washSearch.toLowerCase())).length === 0 ? (
+                        <div className="text-center py-8 text-ink-muted text-sm">
+                          Aucun type de lavage trouvé pour « {washSearch} »
+                        </div>
+                      ) : (
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="border-b border-edge bg-inset/60">
+                              <th className="px-4 py-2.5 text-xs font-semibold text-ink-faded uppercase tracking-wider">Formule</th>
+                              <th className="px-4 py-2.5 text-xs font-semibold text-ink-faded uppercase tracking-wider text-right">Prix</th>
+                              <th className="px-4 py-2.5 text-xs font-semibold text-ink-faded uppercase tracking-wider text-right hidden sm:table-cell">Durée</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {washTypes
+                              .filter(w => w.nom.toLowerCase().includes(washSearch.toLowerCase()))
+                              .map((w) => {
+                                const sel = washId === w.id
+                                const { icon: WashIcon, gradient } = getWashIconAndGradient(w.nom)
+                                return (
+                                  <tr
+                                    key={w.id}
+                                    onClick={() => setWashId(w.id)}
+                                    className={`border-b border-divider last:border-0 cursor-pointer transition-colors ${
+                                      sel ? 'bg-accent-wash' : 'hover:bg-inset'
+                                    }`}
+                                  >
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                                          <WashIcon className="w-4 h-4 text-accent" />
+                                        </div>
+                                        <div>
+                                          <p className={`text-sm font-semibold ${sel ? 'text-accent' : 'text-ink'}`}>{w.nom}</p>
+                                          {w.particularites && (
+                                            <p className="text-xs text-ink-faded mt-0.5 line-clamp-1">{w.particularites}</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                      <span className={`text-sm font-bold ${sel ? 'text-accent' : 'text-ink-light'}`}>
+                                        {w.prixBase.toLocaleString()} FCFA
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right hidden sm:table-cell">
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        {sel && <Check className="w-4 h-4 text-teal-500" />}
+                                        <span className="text-xs text-ink-muted">{w.dureeEstimee} min</span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
 
                     <div>
@@ -458,17 +537,25 @@ export default function NouveauLavage() {
                         <h3 className="font-heading font-semibold text-ink text-lg">Client</h3>
                         <div className="flex bg-inset rounded-lg p-0.5">
                           <button
-                            onClick={() => setIsNewClient(false)}
+                            onClick={() => { setClientMode('existing'); }}
                             className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                              !isNewClient ? 'bg-accent-wash text-accent' : 'text-ink-faded'
+                              clientMode === 'existing' ? 'bg-accent-wash text-accent' : 'text-ink-faded'
                             }`}
                           >
                             Existant
                           </button>
                           <button
-                            onClick={() => { setIsNewClient(true); setSelectedClientId(null); }}
+                            onClick={() => { setClientMode('prospect'); setSelectedClientId(null); }}
                             className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                              isNewClient ? 'bg-accent-wash text-accent' : 'text-ink-faded'
+                              clientMode === 'prospect' ? 'bg-accent-wash text-accent' : 'text-ink-faded'
+                            }`}
+                          >
+                            Prospect
+                          </button>
+                          <button
+                            onClick={() => { setClientMode('new'); setSelectedClientId(null); }}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                              clientMode === 'new' ? 'bg-accent-wash text-accent' : 'text-ink-faded'
                             }`}
                           >
                             Nouveau
@@ -476,7 +563,7 @@ export default function NouveauLavage() {
                         </div>
                       </div>
 
-                      {!isNewClient ? (
+                      {clientMode === 'existing' ? (
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 bg-inset border border-outline rounded-xl px-4 py-2.5 focus-within:border-teal-500/40 transition-colors">
                             <Search className="w-4 h-4 text-ink-muted" />
@@ -510,6 +597,81 @@ export default function NouveauLavage() {
                               )
                             })}
                           </div>
+                        </div>
+                      ) : clientMode === 'prospect' ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 bg-inset border border-outline rounded-xl px-4 py-2.5 focus-within:border-teal-500/40 transition-colors">
+                            <Search className="w-4 h-4 text-ink-muted shrink-0" />
+                            <input
+                              value={prospectSearch}
+                              onChange={(e) => setProspectSearch(e.target.value)}
+                              placeholder="Rechercher par nom, plaque ou quartier..."
+                              className="bg-transparent text-sm text-ink placeholder-ink-muted outline-none flex-1"
+                            />
+                            {prospectSearch && (
+                              <button onClick={() => setProspectSearch('')} className="text-ink-muted hover:text-ink transition-colors">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          {pendingProspects.length === 0 ? (
+                            <div className="py-8 flex flex-col items-center gap-2 text-center">
+                              <p className="text-sm font-medium text-ink-light">Aucun prospect en attente</p>
+                              <p className="text-xs text-ink-muted">Les prospects enregistrés par les commerciaux apparaissent ici.</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                              {pendingProspects.filter((p) => {
+                                const q = prospectSearch.toLowerCase()
+                                if (!q) return true
+                                return (
+                                  p.prospectNom?.toLowerCase().includes(q) ||
+                                  p.immatriculation?.toLowerCase().includes(q) ||
+                                  p.prospectQuartier?.toLowerCase().includes(q) ||
+                                  p.prospectTelephone?.includes(q)
+                                )
+                              }).map((p) => (
+                                <button
+                                  key={p.id}
+                                  onClick={() => {
+                                    setNewName(p.prospectNom)
+                                    setNewPhone(p.prospectTelephone)
+                                    setNewEmail(p.prospectEmail ?? '')
+                                    setNewQuartier(p.prospectQuartier ?? '')
+                                    setVPlate(p.immatriculation)
+                                    setVBrand(p.vehicleBrand ?? '')
+                                    setVModel(p.vehicleModele ?? '')
+                                    setVColor(p.vehicleColor ?? '')
+                                    setVType(p.vehicleType ?? 'Berline')
+                                    setClientMode('new')
+                                  }}
+                                  className="w-full flex items-center gap-3 p-3 rounded-xl text-left bg-inset border border-divider hover:border-accent-line hover:bg-accent-wash/30 transition-all"
+                                >
+                                  <div className="w-9 h-9 rounded-xl bg-raised flex items-center justify-center text-sm font-bold text-ink-muted shrink-0">
+                                    {p.prospectNom?.[0]?.toUpperCase() ?? '?'}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-ink">{p.prospectNom}</p>
+                                    <p className="text-xs text-ink-muted">{p.immatriculation}
+                                      {p.prospectQuartier && <span> · {p.prospectQuartier}</span>}
+                                    </p>
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-ink-muted/40 shrink-0" />
+                                </button>
+                              ))}
+                              {pendingProspects.length > 0 && prospectSearch && pendingProspects.filter((p) => {
+                                const q = prospectSearch.toLowerCase()
+                                return (
+                                  p.prospectNom?.toLowerCase().includes(q) ||
+                                  p.immatriculation?.toLowerCase().includes(q) ||
+                                  p.prospectQuartier?.toLowerCase().includes(q) ||
+                                  p.prospectTelephone?.includes(q)
+                                )
+                              }).length === 0 && (
+                                <p className="text-xs text-ink-muted text-center py-4">Aucun résultat pour « {prospectSearch} »</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -678,61 +840,128 @@ export default function NouveauLavage() {
                 )}
 
                 {step === 3 && (
-                  <div className="space-y-5">
-                    <h3 className="font-heading font-semibold text-ink text-lg">Affecter les laveurs</h3>
-                    <p className="text-sm text-ink-faded">
-                      Sélectionnez un ou plusieurs laveurs pour ce véhicule.
-                    </p>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-heading font-semibold text-ink text-lg">Affecter les laveurs</h3>
+                      {pickedWasherIds.length > 0 && (
+                        <p className="text-xs font-medium text-accent mt-0.5">
+                          {pickedWasherIds.length} laveur{pickedWasherIds.length > 1 ? 's' : ''} sélectionné{pickedWasherIds.length > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
 
-                    {pickedWasherIds.length > 0 && (
-                      <p className="text-xs font-medium text-accent">
-                        {pickedWasherIds.length} laveur{pickedWasherIds.length > 1 ? 's' : ''} sélectionné{pickedWasherIds.length > 1 ? 's' : ''}
-                      </p>
-                    )}
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" />
+                      <input
+                        type="text"
+                        value={washerSearch}
+                        onChange={(e) => setWasherSearch(e.target.value)}
+                        placeholder="Rechercher un laveur…"
+                        className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-inset border border-edge text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent"
+                      />
+                      {washerSearch && (
+                        <button onClick={() => setWasherSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <X className="w-3.5 h-3.5 text-ink-muted" />
+                        </button>
+                      )}
+                    </div>
 
-                    <div className="space-y-2 pr-2">
-                      {washersList.map((w) => {
-                        const sel = pickedWasherIds.includes(w.id)
-                        const isBusy = busyWasherIds.has(w.id)
-                        return (
-                          <button
-                            key={w.id}
-                            onClick={() => {
-                              if (isBusy && !sel) {
-                                setBusyWasherConfirm(w.id)
-                              } else {
-                                toggleWasher(w.id)
-                              }
-                            }}
-                            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
-                              sel
-                                ? 'border-teal-500 bg-accent-wash'
-                                : isBusy
-                                  ? 'border-warn-line bg-warn-wash/30 hover:border-warn'
-                                  : 'border-edge bg-inset hover:border-outline'
-                            }`}
-                          >
-                            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-sm shrink-0 ${
-                              sel ? 'bg-teal-500 text-white' : 'bg-gradient-to-br from-teal-500/60 to-navy-500 text-white'
-                            }`}>
-                              {sel ? <Check className="w-5 h-5" /> : w.nom[0] + (w.nom.split(' ')[1]?.[0] || '')}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-ink">{w.nom}</p>
-                              <p className={`text-xs mt-0.5 ${isBusy ? 'text-warn font-medium' : 'text-ink-muted'}`}>
-                                {isBusy ? 'Lavage en cours' : 'Laveur'}
-                              </p>
-                            </div>
-                            <div className="shrink-0">
-                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                sel ? 'bg-teal-500 border-teal-500' : 'border-outline'
-                              }`}>
-                                {sel && <Check className="w-3 h-3 text-white" />}
+                    {/* Filter tabs */}
+                    <div className="flex gap-1.5">
+                      {(['all', 'free', 'busy'] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setWasherFilter(f)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            washerFilter === f
+                              ? f === 'busy' ? 'bg-warn text-white' : 'bg-accent text-white'
+                              : 'bg-inset text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          {f === 'all' ? 'Tous' : f === 'free' ? 'Libres' : 'Occupés'}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-2">
+                      {washersList
+                        .filter((w) => {
+                          const q = washerSearch.trim().toLowerCase()
+                          if (q && !`${w.nom} ${w.prenom}`.toLowerCase().includes(q)) return false
+                          const isBusy = busyWasherIds.has(w.id)
+                          if (washerFilter === 'free' && isBusy) return false
+                          if (washerFilter === 'busy' && !isBusy) return false
+                          return true
+                        })
+                        .map((w) => {
+                          const sel = pickedWasherIds.includes(w.id)
+                          const isBusy = busyWasherIds.has(w.id)
+                          const minsLeft = busyWasherInfo.get(w.id)
+                          const photo = avatarUrl(w.profilePicture)
+                          const initials = (w.prenom?.[0] ?? w.nom[0]).toUpperCase() + (w.nom[0] ?? '').toUpperCase()
+                          return (
+                            <button
+                              key={w.id}
+                              onClick={() => {
+                                if (isBusy && !sel) {
+                                  setBusyWasherConfirm(w.id)
+                                } else {
+                                  toggleWasher(w.id)
+                                }
+                              }}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                                sel
+                                  ? 'border-teal-500 bg-accent-wash'
+                                  : isBusy
+                                    ? 'border-warn-line bg-warn-wash/30 hover:border-warn'
+                                    : 'border-edge bg-inset hover:border-outline'
+                              }`}
+                            >
+                              {/* Avatar */}
+                              <div className="relative shrink-0">
+                                <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-heading font-bold text-sm bg-gradient-to-br from-teal-500/60 to-navy-500 text-white">
+                                  {photo
+                                    ? <img src={photo} alt={initials} className="w-full h-full object-cover" />
+                                    : initials
+                                  }
+                                </div>
+                                {sel && (
+                                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-teal-500 flex items-center justify-center">
+                                    <Check className="w-2.5 h-2.5 text-white" />
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          </button>
-                        )
-                      })}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-ink">{w.prenom} {w.nom}</p>
+                                <p className={`text-xs mt-0.5 ${isBusy ? 'text-warn font-medium' : 'text-ink-muted'}`}>
+                                  {isBusy
+                                    ? minsLeft !== undefined
+                                      ? `Libre dans ~${minsLeft} min`
+                                      : 'Lavage en cours'
+                                    : 'Disponible'}
+                                </p>
+                              </div>
+                              <div className="shrink-0">
+                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                  sel ? 'bg-teal-500 border-teal-500' : 'border-outline'
+                                }`}>
+                                  {sel && <Check className="w-3 h-3 text-white" />}
+                                </div>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      {washersList.filter((w) => {
+                        const q = washerSearch.trim().toLowerCase()
+                        if (q && !`${w.nom} ${w.prenom}`.toLowerCase().includes(q)) return false
+                        const isBusy = busyWasherIds.has(w.id)
+                        if (washerFilter === 'free' && isBusy) return false
+                        if (washerFilter === 'busy' && !isBusy) return false
+                        return true
+                      }).length === 0 && (
+                        <p className="text-sm text-ink-muted text-center py-6">Aucun laveur trouvé</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -740,9 +969,39 @@ export default function NouveauLavage() {
                 {step === 4 && (
                   <div className="space-y-5">
                     <h3 className="font-heading font-semibold text-ink text-lg">Coupon de lavage</h3>
-                    <p className="text-sm text-ink-faded">
-                      {createdCoupon ? 'Coupon créé avec succès ! Vous pouvez l\'imprimer.' : 'Vérifiez les informations puis confirmez le lavage.'}
-                    </p>
+
+                    {createdCoupon ? (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.94, y: -6 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                        style={{ background: 'var(--c-ok-wash)', border: '1px solid var(--c-ok-line)' }}
+                      >
+                        {/* Animated checkmark circle */}
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                          className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ background: 'var(--c-ok)' }}
+                        >
+                          <Check className="w-3.5 h-3.5 text-white" />
+                        </motion.div>
+                        <div>
+                          <p className="text-sm font-semibold font-body" style={{ color: 'var(--c-ok)' }}>
+                            Lavage créé avec succès
+                          </p>
+                          <p className="text-xs font-body" style={{ color: 'var(--c-ok)', opacity: 0.7 }}>
+                            Coupon N° {createdCoupon.numero} — Prêt à imprimer.
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <p className="text-sm text-ink-faded">
+                        Vérifiez les informations puis confirmez le lavage.
+                      </p>
+                    )}
 
                     <div id="coupon-print" className="bg-white text-gray-900 rounded-2xl p-8 max-w-md mx-auto shadow-2xl shadow-black/30">
                       <div className="text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">

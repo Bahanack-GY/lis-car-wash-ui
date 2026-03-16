@@ -6,7 +6,7 @@ import {
   Ticket, ArrowLeft, User, Car, Droplets, MapPin, ShieldCheck,
   Clock, Loader2, CheckCircle2, CreditCard, Banknote, Smartphone,
   Play, Square, Wallet, Users, Phone, Mail, Sparkles, Printer, Zap,
-} from 'lucide-react'
+} from '@/lib/icons'
 import Logo from '@/assets/Logo.png'
 import { useCoupon, useUpdateCouponStatus } from '@/api/coupons'
 import { useCreatePaiement } from '@/api/paiements'

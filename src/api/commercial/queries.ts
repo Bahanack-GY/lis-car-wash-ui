@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { commercialApi } from './api';
-import type { RegisterVehicleDto } from './types';
+import type { RegisterVehicleDto, TransferPortfolioDto } from './types';
 
 export interface HistoryFilters {
     from?: string;
@@ -15,6 +15,8 @@ export const COMMERCIAL_KEYS = {
     stats: () => [...COMMERCIAL_KEYS.all, 'stats'] as const,
     userStats: (userId: number) => [...COMMERCIAL_KEYS.all, 'userStats', userId] as const,
     history: (filters: HistoryFilters) => [...COMMERCIAL_KEYS.all, 'history', filters] as const,
+    portfolio: () => [...COMMERCIAL_KEYS.all, 'portfolio'] as const,
+    pending: () => [...COMMERCIAL_KEYS.all, 'pending'] as const,
 };
 
 export const useCommercialToday = () => {
@@ -57,6 +59,32 @@ export const useRegisterVehicle = () => {
             queryClient.invalidateQueries({ queryKey: COMMERCIAL_KEYS.today() });
             queryClient.invalidateQueries({ queryKey: COMMERCIAL_KEYS.stats() });
             queryClient.invalidateQueries({ queryKey: [...COMMERCIAL_KEYS.all, 'history'] });
+        },
+    });
+};
+
+export const useCommercialPortfolio = () => {
+    return useQuery({
+        queryKey: COMMERCIAL_KEYS.portfolio(),
+        queryFn: () => commercialApi.getPortfolio(),
+    });
+};
+
+export const useCommercialPending = () => {
+    return useQuery({
+        queryKey: COMMERCIAL_KEYS.pending(),
+        queryFn: () => commercialApi.getPending(),
+        refetchInterval: 30_000,
+    });
+};
+
+export const useTransferPortfolio = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: TransferPortfolioDto) => commercialApi.transferPortfolio(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: COMMERCIAL_KEYS.portfolio() });
         },
     });
 };

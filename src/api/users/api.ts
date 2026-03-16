@@ -71,4 +71,13 @@ export const usersApi = {
         const response = await apiClient.get<LeaderboardEntry[]>('/users/leaderboard', { params: { type, stationId } });
         return response.data;
     },
+
+    uploadAvatar: async ({ id, file }: { id: number; file: File }): Promise<User> => {
+        const form = new FormData();
+        form.append('file', file);
+        const response = await apiClient.post<User>(`/users/${id}/avatar`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+    },
 };

@@ -47,7 +47,7 @@ import {
   Percent,
   ToggleLeft,
   ToggleRight,
-} from 'lucide-react'
+} from '@/lib/icons'
 import {
   useMarketingInsights,
   useMarketingSegments,

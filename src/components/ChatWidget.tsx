@@ -11,7 +11,7 @@ import {
   ChevronDown,
   Sparkles,
   Trash2,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useChatbotQuery } from '@/api/chatbot'
 import type { ChatMessage } from '@/api/chatbot'
 
@@ -233,7 +233,8 @@ export default function ChatWidget() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setOpen(true)}
-            className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-linear-to-br from-teal-500 to-teal-700 text-white shadow-lg shadow-teal-500/25 flex items-center justify-center cursor-pointer"
+            className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl text-white shadow-lg flex items-center justify-center cursor-pointer"
+            style={{ background: '#283852', boxShadow: '0 8px 24px rgba(40,56,82,0.3)' }}
           >
             <MessageSquare size={22} />
           </motion.button>
@@ -251,10 +252,10 @@ export default function ChatWidget() {
             className="fixed bottom-6 right-6 z-50 w-[420px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-3rem)] flex flex-col rounded-2xl border border-edge bg-surface shadow-2xl shadow-black/10 overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-linear-to-r from-navy-800 to-navy-700 text-white shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 text-white shrink-0" style={{ background: '#283852' }}>
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                  <Sparkles size={16} className="text-teal-400" />
+                  <Sparkles size={16} style={{ color: '#33cbcc' }} />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold font-heading leading-tight">

@@ -4,11 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, UserCheck, AlertTriangle, Building2,
   ScrollText, LogOut, ChevronLeft, Menu, Sun, Moon, ArrowLeft,
-} from 'lucide-react'
+} from '@/lib/icons'
 import Logo from '@/assets/Logo.png'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth, type UserRole } from '@/contexts/AuthContext'
 import ChatWidget from '@/components/ChatWidget'
+
+const NAVY = '#283852'
+const TEAL = '#33cbcc'
+const WASH = '#e3f6f6'
 
 interface NavItem {
   path: string
@@ -37,7 +41,7 @@ const roleLabel: Record<UserRole, string> = {
 }
 
 const pageTitles: Record<string, string> = {
-  '/global-dashboard': 'Vue d\'ensemble',
+  '/global-dashboard': "Vue d'ensemble",
   '/global-dashboard/employees': 'Employés',
   '/global-dashboard/clients': 'Clients',
   '/global-dashboard/incidents': 'Incidents',
@@ -56,57 +60,59 @@ export default function AdminLayout() {
   const initials = user ? `${user.prenom[0]}${user.nom[0]}` : '?'
   const pageTitle = pageTitles[location.pathname] ?? 'Administration'
 
-  const handleLogout = () => {
-    logout()
-    navigate('/')
-  }
+  const handleLogout = () => { logout(); navigate('/') }
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
-      {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-40 lg:hidden"
             onClick={() => setMobileOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
+      {/* ── Sidebar ───────────────────────────────────── */}
       <motion.aside
         className={`
           fixed lg:relative z-50 h-full flex flex-col
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           transition-transform duration-300 ease-in-out
-          bg-panel border-r border-edge
         `}
-        animate={{ width: collapsed ? 80 : 272 }}
+        style={{ background: NAVY }}
+        animate={{ width: collapsed ? 72 : 272 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-edge shrink-0">
-          <img src={Logo} alt="LIS" className="w-9 h-9 rounded-lg object-contain shrink-0" />
+        <div className="flex items-center gap-3 px-4 h-16 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="flex-shrink-0">
+            {collapsed ? (
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(51,203,204,0.15)' }}>
+                <img src={Logo} alt="LIS" className="w-5 h-5 object-contain" />
+              </div>
+            ) : (
+              <img src={Logo} alt="LIS" className="w-9 h-9 object-contain" />
+            )}
+          </div>
           <AnimatePresence>
             {!collapsed && (
               <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
+                initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }}
                 className="overflow-hidden whitespace-nowrap"
               >
-                <h1 className="font-heading font-bold text-base text-ink leading-tight">LIS Car Wash</h1>
-                <p className="text-[11px] text-ink-muted leading-tight">Administration globale</p>
+                <h1 className="font-heading font-bold text-sm leading-tight text-white">LIS Car Wash</h1>
+                <p className="text-[10px] leading-tight font-body" style={{ color: TEAL, opacity: 0.7, fontFamily: 'var(--font-body)' }}>
+                  Admin Global
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 py-4 px-2 space-y-0.5 overflow-y-auto sidebar-scroll">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -115,27 +121,31 @@ export default function AdminLayout() {
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-                  isActive ? 'bg-accent-wash text-accent' : 'text-ink-faded hover:text-ink hover:bg-raised'
-                }`
+                  isActive ? 'text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                } ${collapsed ? 'justify-center px-0' : ''}`
               }
+              style={({ isActive }) => ({ background: isActive ? 'rgba(51,203,204,0.18)' : undefined })}
             >
               {({ isActive }) => (
                 <>
                   {isActive && (
                     <motion.div
                       layoutId="admin-sidebar-active"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-teal-500 rounded-r-full"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full"
+                      style={{ background: TEAL }}
                       transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                     />
                   )}
-                  <item.icon className="w-[20px] h-[20px] shrink-0" />
+                  <item.icon
+                    className={`flex-shrink-0 ${collapsed ? 'w-5 h-5' : 'w-[18px] h-[18px]'}`}
+                    style={{ color: isActive ? TEAL : undefined }}
+                  />
                   <AnimatePresence>
                     {!collapsed && (
                       <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: 'auto' }}
-                        exit={{ opacity: 0, width: 0 }}
-                        className="text-sm font-medium overflow-hidden whitespace-nowrap"
+                        initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }}
+                        className="text-sm overflow-hidden whitespace-nowrap font-body"
+                        style={{ fontFamily: 'var(--font-body)', fontWeight: isActive ? 500 : 400 }}
                       >
                         {item.label}
                       </motion.span>
@@ -148,19 +158,18 @@ export default function AdminLayout() {
         </nav>
 
         {/* Back to stations */}
-        <div className="px-3 py-2 border-t border-edge">
+        <div className="px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <button
             onClick={() => navigate('/select-station')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-muted hover:text-ink hover:bg-raised transition-colors"
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-white/30 hover:text-white/60 hover:bg-white/5 ${collapsed ? 'justify-center px-0' : ''}`}
           >
-            <ArrowLeft className="w-[20px] h-[20px] shrink-0" />
+            <ArrowLeft className="w-[18px] h-[18px] flex-shrink-0" />
             <AnimatePresence>
               {!collapsed && (
                 <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
-                  className="text-sm font-medium overflow-hidden whitespace-nowrap"
+                  initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }}
+                  className="text-sm font-body overflow-hidden whitespace-nowrap"
+                  style={{ fontFamily: 'var(--font-body)' }}
                 >
                   Retour aux stations
                 </motion.span>
@@ -170,37 +179,45 @@ export default function AdminLayout() {
         </div>
 
         {/* Collapse */}
-        <div className="hidden lg:block px-3 py-2 border-t border-edge">
+        <div className="hidden lg:block px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-ink-muted hover:text-ink hover:bg-raised transition-colors"
+            className={`flex items-center gap-3 px-3 py-2.5 w-full rounded-xl transition-colors text-white/30 hover:text-white/60 hover:bg-white/5 ${collapsed ? 'justify-center px-0' : ''}`}
           >
-            <ChevronLeft className={`w-[20px] h-[20px] transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
-            {!collapsed && <span className="text-sm">Réduire</span>}
+            <ChevronLeft
+              className="w-[18px] h-[18px] transition-transform duration-300"
+              style={{ transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+            {!collapsed && <span className="text-sm font-body" style={{ fontFamily: 'var(--font-body)' }}>Réduire</span>}
           </button>
         </div>
 
         {/* User info */}
-        <div className="px-3 py-4 border-t border-edge shrink-0">
-          <div className="flex items-center gap-3 px-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold text-xs shrink-0">
+        <div className="px-3 py-4 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : 'px-2'}`}>
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+              style={{ background: TEAL }}
+            >
               {initials}
             </div>
             <AnimatePresence>
               {!collapsed && (
                 <motion.div
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
+                  initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }}
                   className="overflow-hidden flex-1 min-w-0"
                 >
-                  <p className="text-sm font-medium text-ink truncate">{user ? `${user.prenom} ${user.nom}` : '—'}</p>
-                  <p className="text-xs text-ink-muted truncate">{user ? roleLabel[user.role as UserRole] : ''}</p>
+                  <p className="text-sm font-medium text-white truncate font-body" style={{ fontFamily: 'var(--font-body)' }}>
+                    {user ? `${user.prenom} ${user.nom}` : '—'}
+                  </p>
+                  <p className="text-xs truncate font-body" style={{ color: WASH, opacity: 0.4, fontFamily: 'var(--font-body)' }}>
+                    {user ? roleLabel[user.role as UserRole] : ''}
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
             {!collapsed && (
-              <button onClick={handleLogout} className="text-ink-muted hover:text-red-500 transition-colors shrink-0" title="Déconnexion">
+              <button onClick={handleLogout} className="text-white/30 hover:text-red-400 transition-colors flex-shrink-0" title="Déconnexion">
                 <LogOut className="w-4 h-4" />
               </button>
             )}
@@ -208,27 +225,30 @@ export default function AdminLayout() {
         </div>
       </motion.aside>
 
-      {/* Main area */}
+      {/* ── Main area ─────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top bar */}
-        <header className="h-16 border-b border-edge bg-panel flex items-center justify-between px-6 shrink-0">
+        <header className="h-16 border-b border-edge bg-panel flex items-center justify-between px-4 sm:px-6 flex-shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden text-ink-muted hover:text-ink transition-colors">
               <Menu className="w-6 h-6" />
             </button>
-            <h2 className="font-heading font-semibold text-ink text-lg">{pageTitle}</h2>
+            <h2 className="font-heading font-bold text-ink text-lg" style={{ letterSpacing: '-0.01em' }}>{pageTitle}</h2>
           </div>
 
           <div className="flex items-center gap-3">
             {user && (
               <div className="hidden md:flex items-center gap-2 text-sm text-ink-muted">
-                <span className="font-medium text-ink">{user.prenom} {user.nom}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-accent-wash text-accent font-medium">
+                <span className="font-medium text-ink font-body" style={{ fontFamily: 'var(--font-body)' }}>
+                  {user.prenom} {user.nom}
+                </span>
+                <span
+                  className="text-xs px-2.5 py-1 rounded-full font-medium font-body"
+                  style={{ background: WASH, color: NAVY, fontFamily: 'var(--font-body)' }}
+                >
                   {roleLabel[user.role as UserRole] ?? user.role}
                 </span>
               </div>
             )}
-
             <button
               onClick={toggle}
               className="text-ink-muted hover:text-ink transition-colors p-2 rounded-xl hover:bg-raised"
@@ -239,13 +259,11 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
               transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
             >
               <Outlet />

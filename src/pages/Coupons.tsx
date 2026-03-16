@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Ticket, Search, Plus, User, Car, CheckCircle2, Clock, Loader2, Droplets } from 'lucide-react'
+import { Ticket, Search, Plus, User, Car, CheckCircle2, Clock, Loader2, Droplets, LayoutList, LayoutGrid, ChevronRight } from '@/lib/icons'
 import { useCoupons, useUpdateCouponStatus } from '@/api/coupons'
 import type { Coupon } from '@/api/coupons/types'
 import { useAuth } from '@/contexts/AuthContext'
@@ -34,6 +34,7 @@ const emptyMessages: Record<string, string> = {
 
 export default function Coupons() {
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'table' | 'grid'>('table')
   const [activeTab, setActiveTab] = useState('Tous')
   const navigate = useNavigate()
 
@@ -93,6 +94,22 @@ export default function Coupons() {
           />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
+          <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden shrink-0">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue tableau"
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue grille"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
           <div className="flex bg-raised border border-edge rounded-xl p-1 shrink-0">
             {tabs.map((t) => {
               const count = tabCounts[t] ?? 0
@@ -129,9 +146,91 @@ export default function Coupons() {
         <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
           {emptyMessages[activeTab] || 'Aucun coupon trouvé.'}
         </div>
+      ) : view === 'table' ? (
+        <motion.div
+          key={`table-${activeTab}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+        >
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-divider bg-inset">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Numéro</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Client</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Véhicule</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden lg:table-cell">Formule</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Montant</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Statut</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-divider">
+              {filtered.map((c) => {
+                const st = statusCfg[c.statut] || { label: c.statut, cls: 'bg-raised text-ink-muted border-edge', icon: Clock }
+                const StIcon = st.icon
+                const displayDate = new Date(c.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+                const displayTime = new Date(c.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                const clientName = c.fichePiste?.client?.nom || 'Client inconnu'
+                const vehiclePlate = c.fichePiste?.vehicle?.immatriculation || '—'
+                const vehicleModel = c.fichePiste?.vehicle?.modele || ''
+                const washType = c.fichePiste?.typeLavage?.nom || 'Lavage'
+                const montant = Number(c.montantTotal) || 0
+
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => navigate(`/coupons/${c.id}`)}
+                    className="hover:bg-raised transition-colors cursor-pointer group"
+                  >
+                    <td className="px-4 py-3">
+                      <div>
+                        <span className="font-mono font-bold text-accent">{c.numero}</span>
+                        <p className="text-[10px] text-ink-ghost mt-0.5">{displayDate} {displayTime}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span className="font-medium text-ink text-xs">{clientName}</span>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <span className="text-xs text-ink-muted">{vehiclePlate}{vehicleModel ? ` · ${vehicleModel}` : ''}</span>
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                        <Droplets className="w-3 h-3 text-accent" /> {washType}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right hidden sm:table-cell">
+                      <span className="text-xs font-semibold text-accent">{montant.toLocaleString()} F</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const nextStatus = c.statut === 'pending' ? 'washing' : c.statut === 'washing' ? 'done' : 'pending'
+                          updateStatus.mutate({ id: c.id, data: { statut: nextStatus } })
+                        }}
+                        disabled={updateStatus.isPending}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border hover:opacity-80 disabled:opacity-50 ${st.cls}`}
+                        title="Changer le statut"
+                      >
+                        <StIcon className={`w-3 h-3 ${c.statut === 'washing' ? 'animate-spin' : ''}`} />
+                        {st.label}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3">
+                      <ChevronRight className="w-4 h-4 text-ink-ghost group-hover:text-accent transition-colors" />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </motion.div>
       ) : (
         <motion.div
-          key={activeTab}
+          key={`grid-${activeTab}`}
           variants={stagger}
           initial="hidden"
           animate="show"

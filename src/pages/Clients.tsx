@@ -6,7 +6,8 @@ import {
   Users, Search, Plus, Phone, Car, Award, CreditCard,
   ChevronRight, ChevronLeft, X, Mail, Palette, Tag, Truck,
   SlidersHorizontal, CalendarDays, MapPin, Download,
-} from 'lucide-react'
+  LayoutGrid, LayoutList,
+} from '@/lib/icons'
 import { useClients, useCreateClient, useCreateVehicle } from '@/api/clients'
 import { clientsApi } from '@/api/clients/api'
 import type { CreateClientDto, CreateVehicleDto, Client } from '@/api/clients/types'
@@ -33,6 +34,7 @@ export default function Clients() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const [view, setView] = useState<'table' | 'grid'>('table')
 
   /* ── Debounce search ─────────────────────────────── */
   useEffect(() => {
@@ -223,6 +225,23 @@ export default function Clients() {
                 </span>
               )}
             </button>
+            {/* View toggle */}
+            <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden shrink-0">
+              <button
+                onClick={() => setView('table')}
+                className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+                title="Vue tableau"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setView('grid')}
+                className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+                title="Vue grille"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* ── Filter panel ────────────────────────── */}
@@ -342,69 +361,157 @@ export default function Clients() {
           </div>
         ) : (
           <>
-            <motion.div
-              key={`${debouncedSearch}-${debouncedPhone}-${debouncedQuartier}-${vehicleType}-${dateFrom}-${dateTo}-${page}`}
-              variants={stagger}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-            >
-              {clientsList.map((c) => {
-                const initials = c.nom.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-                const vehicleCount = Number(c.vehicleCount) || 0
-                const points = Number(c.pointsFidelite) || 0
-                const hasActiveSub = Number(c.activeSubscriptionCount) > 0
+            {view === 'table' ? (
+              /* ── Table view ──────────────────────────── */
+              <motion.div
+                key={`table-${debouncedSearch}-${debouncedPhone}-${debouncedQuartier}-${vehicleType}-${dateFrom}-${dateTo}-${page}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-divider bg-inset">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Client</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Contact</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Quartier</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden lg:table-cell">Véhicules</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Points</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Statut</th>
+                      <th className="w-10" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-divider">
+                    {clientsList.map((c) => {
+                      const initials = c.nom.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                      const vehicleCount = Number(c.vehicleCount) || 0
+                      const points = Number(c.pointsFidelite) || 0
+                      const hasActiveSub = Number(c.activeSubscriptionCount) > 0
 
-                return (
-                  <motion.div key={c.id} variants={rise} onClick={() => navigate(`/clients/${c.id}`)} className="bg-panel border border-edge rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 group cursor-pointer">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-full bg-linear-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-sm shrink-0">
-                        {initials}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-heading font-semibold text-ink line-clamp-1">{c.nom}</h3>
-                          <ChevronRight className="w-4 h-4 text-ink-ghost group-hover:text-accent transition-colors shrink-0" />
+                      return (
+                        <tr
+                          key={c.id}
+                          onClick={() => navigate(`/clients/${c.id}`)}
+                          className="hover:bg-raised transition-colors cursor-pointer group"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-linear-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                                {initials}
+                              </div>
+                              <span className="font-medium text-ink">{c.nom}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 hidden sm:table-cell">
+                            <div className="space-y-0.5">
+                              {c.contact && (
+                                <p className="text-xs text-ink-faded flex items-center gap-1">
+                                  <Phone className="w-3 h-3 shrink-0" /> {c.contact}
+                                </p>
+                              )}
+                              {c.email && (
+                                <p className="text-xs text-ink-faded flex items-center gap-1 truncate max-w-[180px]">
+                                  <Mail className="w-3 h-3 shrink-0" /> {c.email}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-ink-muted hidden md:table-cell">
+                            {c.quartier || <span className="text-ink-ghost">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-center hidden lg:table-cell">
+                            <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                              <Car className="w-3.5 h-3.5" /> {vehicleCount}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-sm font-semibold text-accent">{points.toLocaleString()}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center hidden sm:table-cell">
+                            {hasActiveSub ? (
+                              <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-accent-wash text-accent-bold border border-accent-line">
+                                Abonné
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md text-xs text-ink-muted bg-raised border border-edge">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <ChevronRight className="w-4 h-4 text-ink-ghost group-hover:text-accent transition-colors" />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </motion.div>
+            ) : (
+              /* ── Grid view ───────────────────────────── */
+              <motion.div
+                key={`grid-${debouncedSearch}-${debouncedPhone}-${debouncedQuartier}-${vehicleType}-${dateFrom}-${dateTo}-${page}`}
+                variants={stagger}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+              >
+                {clientsList.map((c) => {
+                  const initials = c.nom.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                  const vehicleCount = Number(c.vehicleCount) || 0
+                  const points = Number(c.pointsFidelite) || 0
+                  const hasActiveSub = Number(c.activeSubscriptionCount) > 0
+
+                  return (
+                    <motion.div key={c.id} variants={rise} onClick={() => navigate(`/clients/${c.id}`)} className="bg-panel border border-edge rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 group cursor-pointer">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-sm shrink-0">
+                          {initials}
                         </div>
-                        {c.contact && (
-                          <p className="text-xs text-ink-faded flex items-center gap-1.5 mt-1">
-                            <Phone className="w-3 h-3" /> {c.contact}
-                          </p>
-                        )}
-                        {c.email && (
-                          <p className="text-xs text-ink-faded flex items-center gap-1.5 mt-0.5">
-                            <Mail className="w-3 h-3" /> {c.email}
-                          </p>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-heading font-semibold text-ink line-clamp-1">{c.nom}</h3>
+                            <ChevronRight className="w-4 h-4 text-ink-ghost group-hover:text-accent transition-colors shrink-0" />
+                          </div>
+                          {c.contact && (
+                            <p className="text-xs text-ink-faded flex items-center gap-1.5 mt-1">
+                              <Phone className="w-3 h-3" /> {c.contact}
+                            </p>
+                          )}
+                          {c.email && (
+                            <p className="text-xs text-ink-faded flex items-center gap-1.5 mt-0.5">
+                              <Mail className="w-3 h-3" /> {c.email}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-divider">
-                      <div className="text-center">
-                        <p className="text-sm font-semibold text-ink flex items-center justify-center gap-1">
-                          <Car className="w-3.5 h-3.5 text-ink-muted" /> {vehicleCount}
-                        </p>
-                        <p className="text-xs text-ink-muted mt-0.5">Véhicule{vehicleCount !== 1 ? 's' : ''}</p>
+                      <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-divider">
+                        <div className="text-center">
+                          <p className="text-sm font-semibold text-ink flex items-center justify-center gap-1">
+                            <Car className="w-3.5 h-3.5 text-ink-muted" /> {vehicleCount}
+                          </p>
+                          <p className="text-xs text-ink-muted mt-0.5">Véhicule{vehicleCount !== 1 ? 's' : ''}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-semibold text-accent">{points.toLocaleString()}</p>
+                          <p className="text-xs text-ink-muted mt-0.5">Points</p>
+                        </div>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm font-semibold text-accent">{points.toLocaleString()}</p>
-                        <p className="text-xs text-ink-muted mt-0.5">Points</p>
-                      </div>
-                    </div>
 
-                    <div className="mt-3 flex items-center justify-end">
-                      {hasActiveSub ? (
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-accent-wash text-accent-bold border border-accent-line">
-                          Abonné
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-lg text-xs text-ink-muted bg-raised border border-edge">Sans abonnement</span>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </motion.div>
+                      <div className="mt-3 flex items-center justify-end">
+                        {hasActiveSub ? (
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-accent-wash text-accent-bold border border-accent-line">
+                            Abonné
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-lg text-xs text-ink-muted bg-raised border border-edge">Sans abonnement</span>
+                        )}
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </motion.div>
+            )}
 
             {/* ── Pagination ──────────────────────────── */}
             {totalPages > 1 && (

@@ -1,3 +1,5 @@
+export type UniteStock = 'L' | 'mL' | 'pcs' | 'kg' | 'g' | 'carton' | 'sachet' | 'bouteille' | 'bidon' | 'rouleau';
+
 export interface Produit {
     id: number;
     stationId: number;
@@ -6,6 +8,7 @@ export interface Produit {
     quantiteStock: number;
     quantiteAlerte: number;
     prix?: number;
+    prixRevient?: number;
     unite?: string;
     createdAt: string;
     updatedAt: string;
@@ -25,6 +28,7 @@ export interface CreateProduitDto {
     quantiteStock?: number;
     quantiteAlerte?: number;
     prix?: number;
+    prixRevient?: number;
     unite?: string;
 }
 

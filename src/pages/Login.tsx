@@ -1,19 +1,33 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight } from '@/lib/icons'
 import Logo from '@/assets/Logo.png'
 import { useLogin } from '@/api/auth'
 import { useAuth } from '@/contexts/AuthContext'
 
+const NAVY   = '#283852'
+const TEAL   = '#33cbcc'
+const WASH   = '#e3f6f6'
+
+function getTimeContext(): { greeting: string; note: string } {
+  const h = new Date().getHours()
+  if (h >= 5  && h < 12) return { greeting: 'Bonne matinée',  note: "La journée commence. L'équipe vous attend." }
+  if (h >= 12 && h < 14) return { greeting: 'Bonne journée',  note: 'Service de mi-journée en cours.' }
+  if (h >= 14 && h < 19) return { greeting: 'Bon après-midi', note: "L'activité bat son plein." }
+  if (h >= 19 && h < 22) return { greeting: 'Bonne soirée',   note: 'La journée tire à sa fin.' }
+  return                         { greeting: 'Bonne nuit',     note: 'Quelqu\'un travaille tard ce soir.' }
+}
+
 export default function Login() {
+  const timeCtx = getTimeContext()
   const [showPw, setShowPw] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
   const { login, setStation } = useAuth()
 
-  const loginMutation = useLogin();
+  const loginMutation = useLogin()
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,19 +35,13 @@ export default function Login() {
       const response = await loginMutation.mutateAsync({ email, password })
       const { user: profile, access_token, refresh_token } = response
 
-      // Store token + user in context/localStorage
       login(access_token, refresh_token, profile)
 
       if (profile.role === 'super_admin' || (profile.role === 'comptable' && profile.globalAccess)) {
-        // Owner / global comptable picks their station manually
         navigate('/select-station')
       } else {
-        // Everyone else is tied to their affectation station — auto-set it
         const stationId = profile.stationIds?.[0]
-        if (stationId) {
-          setStation(stationId)
-        }
-        // Navigate to role-appropriate default page
+        if (stationId) setStation(stationId)
         const path =
           profile.role === 'laveur'      ? '/mon-espace'        :
           profile.role === 'caissiere'   ? '/coupons'           :
@@ -48,134 +56,139 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex bg-panel">
-      {/* ── Left panel (decorative — stays dark) ────── */}
+    <div className="min-h-screen flex" style={{ background: WASH }}>
+
+      {/* ── Left panel — Navy ──────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, x: -50 }}
+        initial={{ opacity: 0, x: -40 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}
-        className="hidden lg:flex lg:w-[55%] relative overflow-hidden flex-col items-center justify-center"
-        style={{ background: 'linear-gradient(160deg, #283852 0%, #1a2b3d 50%, #162132 100%)' }}
+        transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+        className="hidden lg:flex lg:w-[52%] relative overflow-hidden flex-col items-center justify-center p-16"
+        style={{ background: NAVY }}
       >
-        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-teal-500/[0.07] blur-[120px]" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-teal-600/[0.05] blur-[100px]" />
 
-        <div className="absolute bottom-0 left-0 right-0 h-[200px] overflow-hidden">
-          <div className="wave-wrap">
-            <div className="wave-shape" />
-            <div className="wave-shape" />
-            <div className="wave-shape" />
-          </div>
-        </div>
-
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-            backgroundSize: '60px 60px',
-          }}
-        />
-
-        <div className="relative z-10 text-center px-16">
-          <motion.img
-            src={Logo}
-            alt="LIS Car Wash"
-            className="w-36 h-36 mx-auto mb-10 drop-shadow-[0_20px_60px_rgba(51,203,204,0.25)]"
-            initial={{ scale: 0.6, opacity: 0 }}
+        {/* Content */}
+        <div className="relative z-10 text-center">
+          <motion.div
+            initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.6, type: 'spring', stiffness: 120 }}
-          />
+            transition={{ delay: 0.2, duration: 0.5, type: 'spring', stiffness: 150 }}
+            className="w-24 h-24 mx-auto mb-8 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(51,203,204,0.15)', border: `1.5px solid rgba(51,203,204,0.3)` }}
+          >
+            <img src={Logo} alt="LIS" className="w-14 h-14 object-contain" />
+          </motion.div>
+
           <motion.h1
-            className="font-heading text-5xl font-bold text-white mb-4 tracking-tight"
-            initial={{ y: 30, opacity: 0 }}
+            className="font-heading font-bold text-white mb-3"
+            style={{ fontSize: 'clamp(36px, 4vw, 52px)', letterSpacing: '-0.02em', lineHeight: 1.1 }}
+            initial={{ y: 24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.35, duration: 0.5 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
           >
             LIS Car Wash
           </motion.h1>
+
           <motion.p
-            className="text-teal-300/80 text-lg max-w-md mx-auto leading-relaxed"
-            initial={{ y: 30, opacity: 0 }}
+            className="font-body text-base max-w-xs mx-auto leading-relaxed"
+            style={{ color: WASH, opacity: 0.8 }}
+            initial={{ y: 24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.45, duration: 0.5 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
           >
             Système de gestion intelligent pour vos stations de lavage automobile
           </motion.p>
 
-          {Array.from({ length: 8 }).map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute rounded-full"
-              style={{
-                width: 4 + (i % 3) * 3,
-                height: 4 + (i % 3) * 3,
-                background: `rgba(51, 203, 204, ${0.15 + (i % 3) * 0.1})`,
-                left: `${15 + i * 10}%`,
-                bottom: '25%',
-              }}
-              animate={{
-                y: [0, -180 - i * 30],
-                opacity: [0.7, 0],
-                scale: [1, 0.3],
-              }}
-              transition={{
-                duration: 4 + i * 0.6,
-                repeat: Infinity,
-                delay: i * 0.9,
-                ease: 'easeOut',
-              }}
-            />
-          ))}
+          {/* Time-of-day greeting */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.65, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-10 mx-auto max-w-[220px]"
+            style={{
+              borderTop: `1px solid rgba(51,203,204,0.2)`,
+              paddingTop: '1.25rem',
+            }}
+          >
+            <p className="font-heading text-sm font-medium text-white" style={{ opacity: 0.9 }}>
+              {timeCtx.greeting}
+            </p>
+            <p className="font-body text-xs mt-1" style={{ color: WASH, opacity: 0.5 }}>
+              {timeCtx.note}
+            </p>
+          </motion.div>
+
         </div>
 
-        <motion.div
-          className="absolute bottom-8 text-navy-300/60 text-xs tracking-widest uppercase"
+        {/* Bottom brand */}
+        <motion.p
+          className="absolute bottom-6 text-xs font-body tracking-widest uppercase"
+          style={{ color: WASH, opacity: 0.3 }}
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
+          animate={{ opacity: 0.3 }}
+          transition={{ delay: 0.8 }}
         >
-          Propulsé par LIS Technologies
-        </motion.div>
+          LIS Technologies · {new Date().getFullYear()}
+        </motion.p>
       </motion.div>
 
-      {/* ── Right panel (form — light) ──────────────── */}
+      {/* ── Right panel — White form ───────────────── */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="w-full lg:w-[45%] flex items-center justify-center p-8 sm:p-12 bg-panel"
+        transition={{ duration: 0.5, delay: 0.15 }}
+        className="w-full lg:w-[48%] flex items-center justify-center p-6 sm:p-10 lg:p-14 bg-panel"
       >
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-[400px]">
+
           {/* Mobile logo */}
-          <div className="lg:hidden text-center mb-12">
-            <img src={Logo} alt="LIS" className="w-20 h-20 mx-auto mb-4" />
-            <h1 className="font-heading text-2xl font-bold text-ink">
+          <div className="lg:hidden text-center mb-10">
+            <div
+              className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+              style={{ background: WASH }}
+            >
+              <img src={Logo} alt="LIS" className="w-10 h-10 object-contain" />
+            </div>
+            <h1 className="font-heading text-2xl font-bold" style={{ color: NAVY }}>
               LIS Car Wash
             </h1>
           </div>
 
           <motion.div
-            initial={{ y: 24, opacity: 0 }}
+            initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
+            transition={{ delay: 0.35, duration: 0.5 }}
           >
-            <h2 className="font-heading text-3xl font-bold text-ink mb-2">
+            <h2 className="font-heading font-bold mb-1" style={{ fontSize: 32, color: NAVY, letterSpacing: '-0.02em' }}>
               Connexion
             </h2>
-            <p className="text-ink-faded mb-10">
+            <p className="font-body mb-8" style={{ color: 'var(--c-ink-muted)' }}>
               Bienvenue ! Veuillez vous connecter à votre compte.
             </p>
 
+            {/* Error */}
             {loginMutation.isError && (
-              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-sm">
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-5 p-3.5 rounded-xl text-sm font-body flex items-center gap-2"
+                style={{
+                  background: 'var(--c-bad-wash)',
+                  border: '1px solid var(--c-bad-line)',
+                  color: 'var(--c-bad)',
+                }}
+              >
                 Identifiants incorrects. Veuillez réessayer.
-              </div>
+              </motion.div>
             )}
 
             <form onSubmit={submit} className="space-y-5">
+              {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-ink-light mb-2">
+                <label
+                  className="block text-xs font-semibold font-body tracking-wide mb-2"
+                  style={{ color: NAVY }}
+                >
                   Adresse e-mail
                 </label>
                 <input
@@ -183,13 +196,30 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@liscarwash.com"
-                  className="w-full px-4 py-3 bg-inset border border-outline rounded-xl text-ink placeholder-ink-muted outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all duration-200"
+                  className="w-full px-4 py-3 text-sm rounded-xl border outline-none transition-all duration-200 font-body"
+                  style={{
+                    background: 'var(--c-inset)',
+                    borderColor: 'var(--c-outline)',
+                    color: 'var(--c-ink)',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = TEAL
+                    e.target.style.boxShadow = `0 0 0 3px rgba(51,203,204,0.15)`
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'var(--c-outline)'
+                    e.target.style.boxShadow = 'none'
+                  }}
                   required
                 />
               </div>
 
+              {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-ink-light mb-2">
+                <label
+                  className="block text-xs font-semibold font-body tracking-wide mb-2"
+                  style={{ color: NAVY }}
+                >
                   Mot de passe
                 </label>
                 <div className="relative">
@@ -198,55 +228,74 @@ export default function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 pr-12 bg-inset border border-outline rounded-xl text-ink placeholder-ink-muted outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all duration-200"
+                    className="w-full px-4 py-3 pr-12 text-sm rounded-xl border outline-none transition-all duration-200 font-body"
+                    style={{
+                      background: 'var(--c-inset)',
+                      borderColor: 'var(--c-outline)',
+                      color: 'var(--c-ink)',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = TEAL
+                      e.target.style.boxShadow = `0 0 0 3px rgba(51,203,204,0.15)`
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--c-outline)'
+                      e.target.style.boxShadow = 'none'
+                    }}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPw(!showPw)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink-light transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors"
+                    style={{ color: 'var(--c-ink-muted)' }}
                   >
-                    {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
+              {/* Options */}
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-outline bg-panel"
+                    className="w-4 h-4 rounded"
+                    style={{ accentColor: TEAL }}
                   />
-                  <span className="text-sm text-ink-faded">Se souvenir de moi</span>
+                  <span className="text-sm font-body" style={{ color: 'var(--c-ink-faded)' }}>
+                    Se souvenir de moi
+                  </span>
                 </label>
-                <button
-                  type="button"
-                  className="text-sm text-accent hover:text-accent-bold transition-colors"
+                <span
+                  className="text-sm font-body"
+                  style={{ color: 'var(--c-ink-muted)' }}
                 >
-                  Mot de passe oublié ?
-                </button>
+                  Mot de passe oublié ? Contactez l'admin.
+                </span>
               </div>
 
+              {/* Submit */}
               <motion.button
                 type="submit"
                 disabled={loginMutation.isPending}
                 whileHover={{ scale: 1.015 }}
                 whileTap={{ scale: 0.985 }}
-                className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-teal-500/25 hover:shadow-teal-500/35 flex items-center justify-center gap-2 group transition-shadow duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full py-3.5 rounded-xl font-body font-semibold text-sm flex items-center justify-center gap-2 group transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  background: loginMutation.isPending ? 'var(--c-dim)' : TEAL,
+                  color: '#ffffff',
+                  boxShadow: loginMutation.isPending ? 'none' : `0 4px 16px rgba(51,203,204,0.35)`,
+                }}
               >
-                {loginMutation.isPending ? 'Connexion en cours...' : 'Se connecter'}
+                {loginMutation.isPending ? 'Connexion…' : 'Se connecter'}
                 {!loginMutation.isPending && (
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 )}
               </motion.button>
             </form>
 
-            <div className="mt-8 pt-8 border-t border-edge text-center">
-              <p className="text-sm text-ink-muted">
-                Problème de connexion ?{' '}
-                <span className="text-accent hover:underline cursor-pointer">Contactez l'administrateur</span>
-              </p>
-            </div>
+            {/* Footer */}
           </motion.div>
         </div>
       </motion.div>

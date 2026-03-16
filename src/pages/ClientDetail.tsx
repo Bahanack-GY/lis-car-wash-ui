@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft, Phone, Mail, Car, Award, Droplets, Wallet,
   Calendar, CreditCard, Tag, Palette, Truck, Loader2, MapPin,
-} from 'lucide-react'
+} from '@/lib/icons'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer,

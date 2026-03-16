@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import {
   Car, CheckCircle2, Clock, Target, TrendingUp,
   Search, Filter, X, ChevronDown, BarChart3, User, Phone,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useCommercialStats, useCommercialHistory } from '@/api/commercial/queries'
 import type { HistoryFilters } from '@/api/commercial/queries'
 

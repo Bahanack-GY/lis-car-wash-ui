@@ -17,7 +17,7 @@ import {
   AlertCircle,
   User,
   UserPlus,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useReservations, useCreateReservation, useUpdateReservation } from '@/api/reservations'
 import { useClients, useClientVehicles, useCreateClient, useCreateVehicle } from '@/api/clients'
 import { useWashTypes } from '@/api/wash-types'

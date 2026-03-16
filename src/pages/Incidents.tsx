@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   AlertTriangle, Plus, Search, X, Pencil, CheckCircle2,
   AlertCircle, Clock, Ban, ShieldAlert, Info, Zap,
-} from 'lucide-react'
+  LayoutList, LayoutGrid,
+} from '@/lib/icons'
 import { useIncidents, useCreateIncident, useUpdateIncident } from '@/api/incidents'
 import type { Incident, CreateIncidentDto, UpdateIncidentDto, IncidentSeverity } from '@/api/incidents/types'
 import { useAuth } from '@/contexts/AuthContext'
@@ -45,6 +46,7 @@ const emptyForm: CreateIncidentDto = {
 export default function Incidents() {
   const { selectedStationId } = useAuth()
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'table' | 'grid'>('table')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
@@ -219,6 +221,22 @@ export default function Incidents() {
               </button>
             ))}
           </div>
+          <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden shrink-0">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue tableau"
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue grille"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
         </motion.div>
 
         {/* Content */}
@@ -234,6 +252,94 @@ export default function Incidents() {
           <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
             {search ? 'Aucun incident ne correspond à la recherche.' : 'Aucun incident déclaré. La station fonctionne normalement.'}
           </div>
+        ) : view === 'table' ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-divider bg-inset">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Sévérité</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Description</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Statut</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden lg:table-cell">Déclaré par</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Date</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {filtered.map((inc) => {
+                  const sev = severityConfig[inc.severity] || severityConfig.medium
+                  const stat = statusConfig[inc.statut] || statusConfig.open
+                  const SevIcon = sev.icon
+
+                  return (
+                    <tr key={inc.id} className="hover:bg-raised transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${sev.gradient} flex items-center justify-center text-white shrink-0`}>
+                            <SevIcon className="w-3.5 h-3.5" />
+                          </div>
+                          <span className={`text-xs font-semibold ${sev.color}`}>{sev.label}</span>
+                          {inc.stopsActivity && inc.statut !== 'resolved' && (
+                            <Ban className="w-3.5 h-3.5 text-red-500 shrink-0" title="Activité arrêtée" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 max-w-xs">
+                        <p className="text-ink line-clamp-2 text-xs leading-relaxed">{inc.description}</p>
+                      </td>
+                      <td className="px-4 py-3 text-center hidden sm:table-cell">
+                        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${stat.bg} ${stat.color}`}>
+                          {stat.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-muted hidden lg:table-cell">
+                        {inc.declarant ? `${inc.declarant.prenom} ${inc.declarant.nom}` : <span className="text-ink-ghost">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-muted hidden md:table-cell">
+                        {formatDate(inc.dateDeclaration)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {inc.statut === 'open' && (
+                            <button
+                              onClick={() => handleChangeStatus(inc, 'in_progress')}
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                              title="Prendre en charge"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {inc.statut !== 'resolved' && (
+                            <>
+                              <button
+                                onClick={() => handleResolve(inc)}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Résoudre"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => openEdit(inc)}
+                                className="p-1.5 rounded-lg text-ink-ghost hover:text-accent hover:bg-accent-wash transition-colors opacity-0 group-hover:opacity-100"
+                                title="Modifier"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </motion.div>
         ) : (
           <motion.div
             variants={stagger}
@@ -252,11 +358,9 @@ export default function Incidents() {
                   variants={rise}
                   className="bg-panel border border-edge rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 group"
                 >
-                  {/* Gradient header strip */}
                   <div className={`h-1.5 bg-gradient-to-r ${sev.gradient}`} />
 
                   <div className="p-5">
-                    {/* Top row: severity icon + status + edit */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${sev.gradient} flex items-center justify-center text-white shadow-sm`}>
@@ -285,10 +389,8 @@ export default function Incidents() {
                       )}
                     </div>
 
-                    {/* Description */}
                     <p className="text-sm text-ink-light leading-relaxed mb-3 line-clamp-3">{inc.description}</p>
 
-                    {/* Stops activity badge */}
                     {inc.stopsActivity && inc.statut !== 'resolved' && (
                       <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-red-500/10 rounded-lg border border-red-500/20">
                         <Ban className="w-3.5 h-3.5 text-red-500" />
@@ -296,7 +398,6 @@ export default function Incidents() {
                       </div>
                     )}
 
-                    {/* Declarant + resolution info */}
                     <div className="pt-3 border-t border-divider space-y-2">
                       {inc.declarant && (
                         <p className="text-xs text-ink-muted">
@@ -309,7 +410,6 @@ export default function Incidents() {
                         </p>
                       )}
 
-                      {/* Action buttons */}
                       {inc.statut !== 'resolved' && (
                         <div className="flex gap-2 pt-1">
                           {inc.statut === 'open' && (

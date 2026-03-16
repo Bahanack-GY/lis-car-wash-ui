@@ -19,7 +19,7 @@ import {
   Trash2,
   Phone,
   Zap,
-} from 'lucide-react'
+} from '@/lib/icons'
 import { useAuditLogs, useAuditFilterOptions } from '@/api/audit/queries'
 import type { AuditLog, AuditFilters } from '@/api/audit/types'
 

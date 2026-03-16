@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { UserCog, Search, Plus, Phone, Mail, Award, Car, Shield, Filter, ChevronRight, Star, X, MapPin, Target, Coins } from 'lucide-react'
+import { UserCog, Search, Plus, Phone, Mail, Award, Car, Shield, ChevronRight, Star, X, MapPin, Target, Coins, LayoutList, LayoutGrid } from '@/lib/icons'
 import { useUsers, useCreateUser, useAssignStation } from '@/api/users'
 import { useStations } from '@/api/stations'
 import type { CreateUserDto } from '@/api/users/types'
 import { useAuth } from '@/contexts/AuthContext'
+
+const API_ORIGIN = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace('/api', '')
+const avatarUrl = (pic?: string | null) => pic ? `${API_ORIGIN}${pic}` : null
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const rise = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
@@ -27,6 +30,7 @@ export default function Employes() {
   const { selectedStationId: authStationId, user: authUser } = useAuth()
   const isSuperAdmin = authUser?.role === 'super_admin'
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'table' | 'grid'>('table')
   const [roleTab, setRoleTab] = useState('Tous')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState<CreateUserDto>({
@@ -143,9 +147,22 @@ export default function Employes() {
               </button>
             ))}
           </div>
-          <button className="p-2.5 bg-panel border border-edge rounded-xl text-ink-muted hover:text-ink-light shadow-sm transition-colors">
-            <Filter className="w-4 h-4" />
-          </button>
+          <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden shrink-0">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue tableau"
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+              title="Vue grille"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
         </motion.div>
 
         {/* Employee list */}
@@ -161,9 +178,92 @@ export default function Employes() {
           <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
             Aucun employé ne correspond à votre recherche.
           </div>
+        ) : view === 'table' ? (
+          <motion.div
+            key={`table-${roleTab}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-divider bg-inset">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Employé</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Rôle</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Contact</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden lg:table-cell">Station</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Statut</th>
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {filtered.map((e) => {
+                  const role = roleCfg[e.role] || { label: e.role, cls: 'bg-raised text-ink-muted border-edge' }
+                  const initials = (e.prenom?.[0] || '') + (e.nom?.[0] || '')
+                  const activeAffectations = (e.affectations || []).filter(a => a.statut === 'active')
+                  const stationNames = activeAffectations.map(a => a.station?.nom).filter(Boolean)
+
+                  return (
+                    <tr
+                      key={e.id}
+                      onClick={() => navigate(`/employes/${e.id}`)}
+                      className="hover:bg-raised transition-colors cursor-pointer group"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-bold text-xs uppercase shrink-0">
+                            {avatarUrl(e.profilePicture) ? (
+                              <img src={avatarUrl(e.profilePicture)!} alt={initials} className="w-full h-full object-cover" />
+                            ) : initials}
+                          </div>
+                          <span className="font-medium text-ink">{e.prenom} {e.nom}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium border ${role.cls}`}>
+                          <Shield className="w-3 h-3" /> {role.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <div className="space-y-0.5">
+                          {e.telephone && <p className="text-xs text-ink-faded flex items-center gap-1"><Phone className="w-3 h-3 shrink-0" /> {e.telephone}</p>}
+                          <p className="text-xs text-ink-faded flex items-center gap-1 truncate max-w-[180px]"><Mail className="w-3 h-3 shrink-0" /> {e.email}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        {stationNames.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {stationNames.map((name) => (
+                              <span key={name} className="text-xs px-2 py-0.5 rounded-lg bg-accent-wash text-accent-bold border border-accent-line font-medium">
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-ghost">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center hidden sm:table-cell">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                          e.actif !== false ? 'bg-ok-wash text-ok' : 'bg-red-500/10 text-red-600'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${e.actif !== false ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                          {e.actif !== false ? 'Actif' : 'Inactif'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <ChevronRight className="w-4 h-4 text-ink-ghost group-hover:text-accent transition-colors" />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </motion.div>
         ) : (
           <motion.div
-            key={roleTab}
+            key={`grid-${roleTab}`}
             variants={stagger}
             initial="hidden"
             animate="show"
@@ -178,8 +278,10 @@ export default function Employes() {
               return (
                 <motion.div key={e.id} variants={rise} onClick={() => navigate(`/employes/${e.id}`)} className="bg-panel border border-edge rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 cursor-pointer group">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-sm flex-shrink-0 uppercase">
-                      {initials}
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-teal-500 to-navy-500 flex items-center justify-center text-white font-heading font-bold text-sm flex-shrink-0 uppercase">
+                      {avatarUrl(e.profilePicture) ? (
+                        <img src={avatarUrl(e.profilePicture)!} alt={initials} className="w-full h-full object-cover" />
+                      ) : initials}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -217,7 +319,6 @@ export default function Employes() {
                     </div>
                   )}
 
-                  {/* Station assignment */}
                   <div className="mt-3 flex items-center gap-1.5">
                     <MapPin className="w-3 h-3 text-ink-muted shrink-0" />
                     {stationNames.length > 0 ? (

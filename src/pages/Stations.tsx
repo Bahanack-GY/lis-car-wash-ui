@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Building2, Plus, MapPin, Phone, Users, Settings, ArrowUpRight, X, Globe, Clock, Shield, UserX, ArrowRightLeft } from 'lucide-react'
+import { Building2, Plus, MapPin, Phone, Users, Settings, ArrowUpRight, X, Globe, Clock, Shield, UserX, ArrowRightLeft, LayoutList, LayoutGrid, ChevronRight } from '@/lib/icons'
 import { useStations, useCreateStation, useUpdateStation } from '@/api/stations'
 import { useUsers, useCreateUser, useAssignStation, useTransferStation, useUnassignStation } from '@/api/users'
 import { useDashboardStats } from '@/api/dashboard'
@@ -166,6 +166,7 @@ export default function Stations() {
 
   const isSuperAdmin = authUser?.role === 'super_admin'
 
+  const [view, setView] = useState<'table' | 'grid'>('table')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingStation, setEditingStation] = useState<Station | null>(null)
   const [managerStation, setManagerStation] = useState<Station | null>(null)
@@ -347,12 +348,30 @@ export default function Stations() {
             <h1 className="font-heading text-2xl font-bold text-ink flex items-center gap-2"><Building2 className="w-6 h-6 text-accent" /> Stations</h1>
             <p className="text-ink-faded mt-1">Gestion multi-stations et vue d'ensemble</p>
           </div>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-teal-500/25 hover:shadow-teal-500/35 transition-shadow text-sm"
-          >
-            <Plus className="w-4 h-4" /> Ajouter station
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden">
+              <button
+                onClick={() => setView('table')}
+                className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+                title="Vue tableau"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setView('grid')}
+                className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+                title="Vue grille"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-teal-500/25 hover:shadow-teal-500/35 transition-shadow text-sm"
+            >
+              <Plus className="w-4 h-4" /> Ajouter station
+            </button>
+          </div>
         </motion.div>
 
         {/* ── Global stats ── */}
@@ -379,6 +398,105 @@ export default function Stations() {
           <div className="text-center text-ink-muted p-12 border border-dashed border-divider rounded-xl">
             Aucune station n'a été trouvée.
           </div>
+        ) : view === 'table' ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-divider bg-inset">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Station</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Ville</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Statut</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Employés</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden lg:table-cell">Manager</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {stationsList.map((s) => {
+                  const manager = managerByStation.get(s.id)
+                  const managerInitials = manager ? (manager.prenom?.[0] || '') + (manager.nom?.[0] || '') : null
+
+                  return (
+                    <tr key={s.id} className="hover:bg-raised transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${s.status === 'active' ? 'bg-accent-wash' : 'bg-raised'}`}>
+                            <Building2 className={`w-4 h-4 ${s.status === 'active' ? 'text-accent' : 'text-ink-muted'}`} />
+                          </div>
+                          <div>
+                            <p className="font-medium text-ink">{s.nom}</p>
+                            <p className="text-xs text-ink-ghost flex items-center gap-1"><MapPin className="w-3 h-3" />{s.adresse}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-muted hidden sm:table-cell">{s.town}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${
+                          s.status === 'active' ? 'bg-ok-wash text-ok border-ok-line' :
+                          s.status === 'upcoming' ? 'bg-warn-wash text-warn border-warn-line' :
+                          'bg-raised text-ink-muted border-edge'
+                        }`}>
+                          {s.status === 'active' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                          {s.status === 'active' ? 'Active' : s.status === 'upcoming' ? 'Bientôt' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center hidden md:table-cell">
+                        <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                          <Users className="w-3.5 h-3.5" /> {s.activeEmployeesCount ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        {manager ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold text-[10px] uppercase shrink-0">
+                              {managerInitials}
+                            </div>
+                            <span className="text-xs text-ink">{manager.prenom} {manager.nom}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-ghost">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {s.status === 'active' && (
+                            <button
+                              onClick={() => handleViewDetails(s)}
+                              className="p-1.5 rounded-lg text-accent hover:bg-accent-wash transition-colors opacity-0 group-hover:opacity-100"
+                              title="Voir le tableau de bord"
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openEditModal(s)}
+                            className="p-1.5 rounded-lg text-ink-ghost hover:text-ink hover:bg-raised transition-colors opacity-0 group-hover:opacity-100"
+                            title="Modifier"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => setManagerStation(s)}
+                              className="p-1.5 rounded-lg text-ink-ghost hover:text-grape hover:bg-grape-wash transition-colors opacity-0 group-hover:opacity-100"
+                              title={manager ? 'Gérer le manager' : 'Assigner un manager'}
+                            >
+                              <Shield className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </motion.div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {stationsList.map((s) => (

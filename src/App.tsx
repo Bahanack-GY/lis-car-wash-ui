@@ -12,6 +12,7 @@ import Caisse from '@/pages/Caisse'
 import Clients from '@/pages/Clients'
 import ClientDetail from '@/pages/ClientDetail'
 import Inventaire from '@/pages/Inventaire'
+import InventaireDetail from '@/pages/InventaireDetail'
 import Employes from '@/pages/Employes'
 import EmployeDetail from '@/pages/EmployeDetail'
 import Stations from '@/pages/Stations'
@@ -119,6 +120,12 @@ export default function App() {
           <Route path="/inventaire" element={
             <ProtectedRoute roles={['super_admin', 'manager']}>
               <Inventaire />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/inventaire/:id" element={
+            <ProtectedRoute roles={['super_admin', 'manager']}>
+              <InventaireDetail />
             </ProtectedRoute>
           } />
 

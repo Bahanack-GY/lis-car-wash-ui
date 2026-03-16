@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trophy, Medal, Droplets, Megaphone, Crown, Lock } from 'lucide-react'
+import { Trophy, Medal, Droplets, Megaphone, Crown, Lock } from '@/lib/icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLeaderboard } from '@/api/users/queries'
 import type { LeaderboardEntry } from '@/api/users/types'

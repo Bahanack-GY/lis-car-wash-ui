@@ -12,7 +12,7 @@ import {
   Loader2,
   MoreHorizontal,
   Crown,
-} from 'lucide-react'
+} from '@/lib/icons'
 import {
   AreaChart,
   Area,

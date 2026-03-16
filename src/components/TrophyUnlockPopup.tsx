@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, X } from 'lucide-react'
+import { Sparkles, X } from '@/lib/icons'
 import type { Trophy } from '@/lib/trophies'
 
 interface Props {

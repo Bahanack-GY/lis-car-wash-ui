@@ -18,7 +18,9 @@ import {
   AlertCircle,
   FileText,
   Ticket,
-} from 'lucide-react'
+  LayoutList,
+  LayoutGrid,
+} from '@/lib/icons'
 import { useFichesPiste } from '@/api/fiches-piste'
 import { useAuth } from '@/contexts/AuthContext'
 import type { FichePiste } from '@/api/fiches-piste/types'
@@ -44,6 +46,7 @@ export default function FichesPiste() {
   const { selectedStationId } = useAuth()
 
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'table' | 'grid'>('table')
   const [activeTab, setActiveTab] = useState('all')
   const [page, setPage] = useState(1)
 
@@ -115,6 +118,22 @@ export default function FichesPiste() {
             </button>
           ))}
         </div>
+        <div className="hidden sm:flex items-center bg-panel border border-edge rounded-xl overflow-hidden shrink-0">
+          <button
+            onClick={() => setView('table')}
+            className={`p-2.5 transition-colors ${view === 'table' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+            title="Vue tableau"
+          >
+            <LayoutList className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setView('grid')}
+            className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-teal-500/10 text-accent' : 'text-ink-muted hover:text-ink'}`}
+            title="Vue grille"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        </div>
       </motion.div>
 
       {/* ── Content ────────────────────────────────────── */}
@@ -133,117 +152,219 @@ export default function FichesPiste() {
         </div>
       ) : (
         <>
-          <motion.div
-            key={activeTab}
-            variants={stagger}
-            initial="hidden"
-            animate="show"
-            className="grid grid-cols-1 lg:grid-cols-2 gap-4"
-          >
-            {filtered.map((f) => {
-              const st = statusCfg[f.statut] || { label: f.statut, cls: 'bg-raised text-ink-muted border-edge', icon: AlertTriangle }
-              const StIcon = st.icon
-              const displayDate = new Date(f.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-              const clientName = f.client?.nom || `Client #${f.clientId}`
-              const vehiclePlate = f.vehicle?.immatriculation || `#${f.vehicleId}`
-              const vehicleModel = f.vehicle?.modele || ''
-              const washName = f.typeLavage?.nom || `Type #${f.typeLavageId}`
-              const washPrice = f.typeLavage?.prixBase
-              const controleurName = f.controleur ? `${f.controleur.prenom} ${f.controleur.nom}` : null
-              const extras = f.extras || []
-              const couponStatut = f.coupon?.statut
+          {view === 'table' ? (
+            <motion.div
+              key={`table-${activeTab}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className="bg-panel border border-edge rounded-2xl shadow-sm overflow-hidden"
+            >
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-divider bg-inset">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Fiche</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Client</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Véhicule</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden lg:table-cell">Formule</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider">Statut</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden md:table-cell">Coupon</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-ink-faded uppercase tracking-wider hidden sm:table-cell">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-divider">
+                  {filtered.map((f) => {
+                    const st = statusCfg[f.statut] || { label: f.statut, cls: 'bg-raised text-ink-muted border-edge', icon: AlertTriangle }
+                    const StIcon = st.icon
+                    const displayDate = new Date(f.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+                    const clientName = f.client?.nom || `Client #${f.clientId}`
+                    const vehiclePlate = f.vehicle?.immatriculation || `#${f.vehicleId}`
+                    const vehicleModel = f.vehicle?.modele || ''
+                    const washName = f.typeLavage?.nom || `Type #${f.typeLavageId}`
+                    const washPrice = f.typeLavage?.prixBase
+                    const extras = f.extras || []
+                    const couponStatut = f.coupon?.statut
 
-              return (
-                <motion.div
-                  key={f.id}
-                  variants={rise}
-                  onClick={() => f.coupon ? navigate(`/coupons/${f.coupon.id}`) : undefined}
-                  className={`bg-panel border border-edge rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 group ${f.coupon ? 'cursor-pointer' : ''}`}
-                >
-                  {/* ── Card header ─────────────────────────── */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <span className="text-xs font-mono text-accent">{f.numero || `FP-${f.id.toString().padStart(4, '0')}`}</span>
-                      <h3 className="font-heading font-semibold text-ink mt-0.5 flex items-center gap-2">
-                        <Car className="w-4 h-4 text-ink-muted" />
-                        {vehiclePlate}
-                        {vehicleModel && <span className="text-ink-faded font-normal text-sm">— {vehicleModel}</span>}
-                      </h3>
-                    </div>
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${st.cls}`}>
-                      <StIcon className="w-3 h-3" /> {st.label}
-                    </span>
-                  </div>
+                    return (
+                      <tr
+                        key={f.id}
+                        onClick={() => f.coupon ? navigate(`/coupons/${f.coupon.id}`) : undefined}
+                        className={`hover:bg-raised transition-colors group ${f.coupon ? 'cursor-pointer' : ''}`}
+                      >
+                        <td className="px-4 py-3">
+                          <div>
+                            <span className="font-mono text-xs font-bold text-accent">{f.numero || `FP-${f.id.toString().padStart(4, '0')}`}</span>
+                            {extras.length > 0 && (
+                              <div className="flex items-center gap-0.5 mt-0.5">
+                                <Sparkles className="w-3 h-3 text-grape" />
+                                <span className="text-[10px] text-ink-ghost">{extras.length} extra{extras.length > 1 ? 's' : ''}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <div>
+                            <p className="text-xs font-medium text-ink">{clientName}</p>
+                            {f.client?.contact && (
+                              <p className="text-[10px] text-ink-ghost flex items-center gap-0.5 mt-0.5">
+                                <Phone className="w-2.5 h-2.5" /> {f.client.contact}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                            <Car className="w-3.5 h-3.5" /> {vehiclePlate}{vehicleModel ? ` · ${vehicleModel}` : ''}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          <div>
+                            <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                              <Droplets className="w-3 h-3 text-accent" /> {washName}
+                            </span>
+                            {washPrice != null && (
+                              <p className="text-[10px] text-ok font-semibold mt-0.5">{Number(washPrice).toLocaleString()} F</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${st.cls}`}>
+                            <StIcon className="w-3 h-3" /> {st.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          {f.coupon ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-accent font-medium">
+                              <Ticket className="w-3 h-3" /> {f.coupon.numero}
+                              {couponStatut && (
+                                <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                                  couponStatut === 'done' ? 'bg-ok-wash text-ok border-ok-line' :
+                                  couponStatut === 'washing' ? 'bg-warn-wash text-warn border-warn-line' :
+                                  'bg-inset text-ink-faded border-edge'
+                                }`}>
+                                  {couponStatut === 'done' ? 'Terminé' : couponStatut === 'washing' ? 'En cours' : 'En attente'}
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-ink-ghost">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-ink-muted hidden sm:table-cell">{displayDate}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={`grid-${activeTab}`}
+              variants={stagger}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+            >
+              {filtered.map((f) => {
+                const st = statusCfg[f.statut] || { label: f.statut, cls: 'bg-raised text-ink-muted border-edge', icon: AlertTriangle }
+                const StIcon = st.icon
+                const displayDate = new Date(f.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+                const clientName = f.client?.nom || `Client #${f.clientId}`
+                const vehiclePlate = f.vehicle?.immatriculation || `#${f.vehicleId}`
+                const vehicleModel = f.vehicle?.modele || ''
+                const washName = f.typeLavage?.nom || `Type #${f.typeLavageId}`
+                const washPrice = f.typeLavage?.prixBase
+                const controleurName = f.controleur ? `${f.controleur.prenom} ${f.controleur.nom}` : null
+                const extras = f.extras || []
+                const couponStatut = f.coupon?.statut
 
-                  {/* ── Info rows ───────────────────────────── */}
-                  <div className="space-y-1.5 text-sm">
-                    <div className="flex items-center gap-2 text-ink-light">
-                      <User className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-                      <span className="font-medium text-ink">{clientName}</span>
-                      {f.client?.contact && (
-                        <span className="text-ink-muted flex items-center gap-1 text-xs">
-                          <Phone className="w-3 h-3" /> {f.client.contact}
-                        </span>
-                      )}
+                return (
+                  <motion.div
+                    key={f.id}
+                    variants={rise}
+                    onClick={() => f.coupon ? navigate(`/coupons/${f.coupon.id}`) : undefined}
+                    className={`bg-panel border border-edge rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 group ${f.coupon ? 'cursor-pointer' : ''}`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <span className="text-xs font-mono text-accent">{f.numero || `FP-${f.id.toString().padStart(4, '0')}`}</span>
+                        <h3 className="font-heading font-semibold text-ink mt-0.5 flex items-center gap-2">
+                          <Car className="w-4 h-4 text-ink-muted" />
+                          {vehiclePlate}
+                          {vehicleModel && <span className="text-ink-faded font-normal text-sm">— {vehicleModel}</span>}
+                        </h3>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${st.cls}`}>
+                        <StIcon className="w-3 h-3" /> {st.label}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 text-ink-light">
-                      <Droplets className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-                      <span>{washName}</span>
-                      {washPrice != null && (
-                        <span className="text-xs font-semibold text-accent">{washPrice.toLocaleString()} FCFA</span>
-                      )}
-                    </div>
-                    {controleurName && (
+
+                    <div className="space-y-1.5 text-sm">
                       <div className="flex items-center gap-2 text-ink-light">
                         <User className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-                        <span className="text-ink-faded text-xs">Contrôleur:</span>
-                        <span>{controleurName}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ── Extras ──────────────────────────────── */}
-                  {extras.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {extras.map(e => (
-                        <span key={e.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-wash text-accent-bold rounded-md text-xs">
-                          <Sparkles className="w-3 h-3" /> {e.nom}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* ── Etat des lieux ──────────────────────── */}
-                  {f.etatLieu && (
-                    <div className="mt-3 p-3 bg-inset rounded-xl">
-                      <p className="text-xs text-ink-faded mb-0.5 font-medium">État des lieux</p>
-                      <p className="text-sm text-ink-light">{f.etatLieu}</p>
-                    </div>
-                  )}
-
-                  {/* ── Footer ─────────────────────────────── */}
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-divider">
-                    <span className="text-xs text-ink-muted">{displayDate}</span>
-                    {f.coupon && (
-                      <span className="flex items-center gap-1.5 text-xs text-accent font-medium">
-                        <Ticket className="w-3.5 h-3.5" />
-                        {f.coupon.numero}
-                        {couponStatut && (
-                          <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                            couponStatut === 'done' ? 'bg-ok-wash text-ok border-ok-line' :
-                            couponStatut === 'washing' ? 'bg-warn-wash text-warn border-warn-line' :
-                            'bg-inset text-ink-faded border-edge'
-                          }`}>
-                            {couponStatut === 'done' ? 'Terminé' : couponStatut === 'washing' ? 'En cours' : 'En attente'}
+                        <span className="font-medium text-ink">{clientName}</span>
+                        {f.client?.contact && (
+                          <span className="text-ink-muted flex items-center gap-1 text-xs">
+                            <Phone className="w-3 h-3" /> {f.client.contact}
                           </span>
                         )}
-                      </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-ink-light">
+                        <Droplets className="w-3.5 h-3.5 text-ink-muted shrink-0" />
+                        <span>{washName}</span>
+                        {washPrice != null && (
+                          <span className="text-xs font-semibold text-accent">{Number(washPrice).toLocaleString()} FCFA</span>
+                        )}
+                      </div>
+                      {controleurName && (
+                        <div className="flex items-center gap-2 text-ink-light">
+                          <User className="w-3.5 h-3.5 text-ink-muted shrink-0" />
+                          <span className="text-ink-faded text-xs">Contrôleur:</span>
+                          <span>{controleurName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {extras.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {extras.map(e => (
+                          <span key={e.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-wash text-accent-bold rounded-md text-xs">
+                            <Sparkles className="w-3 h-3" /> {e.nom}
+                          </span>
+                        ))}
+                      </div>
                     )}
-                  </div>
-                </motion.div>
-              )
-            })}
-          </motion.div>
+
+                    {f.etatLieu && (
+                      <div className="mt-3 p-3 bg-inset rounded-xl">
+                        <p className="text-xs text-ink-faded mb-0.5 font-medium">État des lieux</p>
+                        <p className="text-sm text-ink-light">{f.etatLieu}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-divider">
+                      <span className="text-xs text-ink-muted">{displayDate}</span>
+                      {f.coupon && (
+                        <span className="flex items-center gap-1.5 text-xs text-accent font-medium">
+                          <Ticket className="w-3.5 h-3.5" />
+                          {f.coupon.numero}
+                          {couponStatut && (
+                            <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                              couponStatut === 'done' ? 'bg-ok-wash text-ok border-ok-line' :
+                              couponStatut === 'washing' ? 'bg-warn-wash text-warn border-warn-line' :
+                              'bg-inset text-ink-faded border-edge'
+                            }`}>
+                              {couponStatut === 'done' ? 'Terminé' : couponStatut === 'washing' ? 'En cours' : 'En attente'}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </motion.div>
+          )}
 
           {/* ── Pagination ──────────────────────────────── */}
           {totalPages > 1 && (

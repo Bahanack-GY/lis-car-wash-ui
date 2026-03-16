@@ -6,7 +6,7 @@ import {
   CreditCard, Banknote, Smartphone, Wallet, Receipt, TrendingUp,
   ArrowDownLeft, ArrowUpRight, Search, Filter, Plus, X,
   Ticket, Car, User, CheckCircle2, ChevronLeft, ChevronRight, Printer, Phone, Droplets, Gift,
-} from 'lucide-react'
+} from '@/lib/icons'
 import Logo from '@/assets/Logo.png'
 import { usePaiements, useCaisseSummary, useCreatePaiement } from '@/api/paiements'
 import { useCoupons, useUpdateCouponStatus } from '@/api/coupons'
